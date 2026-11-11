@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Staying Fit &amp; Better Food Choices</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<style>
+:root {
+  --font-anthropic-sans: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-anthropic-serif: "Source Serif 4", Georgia, serif;
+  --cds-font-size-title: 28px; --cds-font-size-heading: 17px; --cds-font-size-body: 14px; --cds-font-size-caption: 12px;
+  --cds-font-weight-medium: 500;
+  --cds-gap-sm: 8px; --cds-gap-md: 12px; --cds-gap-lg: 16px; --cds-gap-xl: 24px;
+  --cds-pad-xs: 4px; --cds-pad-sm: 8px; --cds-pad-md: 12px; --cds-pad-lg: 16px;
+  --cds-radius: 8px; --cds-shadow-popover: 0 6px 20px rgba(0,0,0,.35);
+}
+html, body { margin: 0; background: #0c0f13; }
+body { font-family: var(--font-anthropic-sans); font-size: 14px; -webkit-text-size-adjust: 100%; }
+body.light { background: #e9ebef; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 16px; }
+.sc select, .sc .dash-select { font: inherit; font-size: var(--cds-font-size-body); color: var(--color-fg); background: var(--color-bg); border: 1px solid var(--sc-line); border-radius: var(--cds-radius); padding: 6px 8px; }
+.sc-updated { margin-top: 12px; text-align: center; font-size: 12px; color: #7d8794; }
+@media (max-width: 600px) { :root { --cds-font-size-title: 24px; } .wrap { padding: 8px; } }
+</style>
+<script>
+// Small stand-in for the Claude dashboard runtime: loads data/log.csv, computes, draws.
+window.dash = (function () {
+  const draws = {}, calcs = {}, cache = {};
+  let log = { status: 'loading', data: null };
+  const api = {
+    colors: ['#5b9bd5', '#f28e2b', '#e15759', '#76b7b2', '#59a14f', '#edc948', '#b07aa1', '#ff9da7', '#9c755f', '#bab0ac', '#86bcb6', '#d4a6c8'],
+    calc(name, def) { calcs[name] = def; },
+    data(name) {
+      if (name === 'log') return log;
+      if (log.status !== 'ok') return { status: log.status, data: null };
+      if (!cache[name]) {
+        const c = calcs[name];
+        try { cache[name] = { status: 'ok', data: c.fn(...c.inputs.map((i) => api.data(i).data)) }; }
+        catch (e) { console.error(name, e); cache[name] = { status: 'error', data: null }; }
+      }
+      return cache[name];
+    },
+    draw(name, fn) {
+      if (fn) draws[name] = fn;
+      document.querySelectorAll('[data-draw="' + name + '"]').forEach((el) => {
+        try { draws[name] && draws[name](el); } catch (e) { console.error(name, e); }
+      });
+    },
+    _all() { Object.keys(draws).forEach((n) => api.draw(n)); }
+  };
+  api._load = () => fetch('data/log.csv?v=' + Date.now()).then((r) => r.text()).then((t) => {
+    log = { status: 'ok', data: d3.csvParse(t, (r) => ({ ...r, steps: r.steps === '' ? null : +r.steps, minimum: +r.minimum })) };
+  }).catch(() => { log = { status: 'error', data: null }; }).then(() => {
+    Object.keys(cache).forEach((k) => delete cache[k]);
+    api._all();
+  });
+  return api;
+})();
+</script>
+</head>
+<body>
+<div class="wrap">
+<style>
+.sc { display: flex; flex-direction: column; gap: var(--cds-gap-xl); font-family: var(--font-anthropic-sans); color: var(--color-fg); }
+.sc h1 { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); margin: 0; text-wrap: balance; }
+.sc h2 { font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); margin: 0; }
+.sc-head { display: flex; flex-direction: column; gap: var(--cds-gap-sm); }
+.sc-lede { margin: 0; max-width: 65ch; line-height: 1.5; }
+.sc-note { margin: 0; color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); max-width: 65ch; }
+.sc-section { display: flex; flex-direction: column; gap: var(--cds-gap-md); }
+.sc-row { display: flex; flex-wrap: wrap; gap: var(--cds-gap-sm); align-items: baseline; justify-content: space-between; }
+.sc-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: var(--cds-gap-md); min-height: 120px; }
+.sc-card { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-lg); display: flex; flex-direction: column; gap: var(--cds-gap-sm); min-width: 0; }
+.sc-card-name { font-weight: var(--cds-font-weight-medium); overflow-wrap: anywhere; }
+.sc-big { font-family: var(--font-anthropic-serif); font-size: var(--cds-font-size-title); font-variant-numeric: tabular-nums; line-height: 1; }
+.sc-big small { font-family: var(--font-anthropic-sans); font-size: var(--cds-font-size-body); color: var(--color-fg-muted); }
+.sc-dots { display: flex; gap: 4px; }
+.sc-dot { flex: 1; height: 22px; border-radius: 4px; border: 1px solid var(--color-border-line); display: grid; place-items: center; font-size: 10px; color: var(--color-fg-muted); }
+.sc-dot.met { background: var(--color-ok); border-color: var(--color-ok); color: var(--color-bg); }
+.sc-dot.miss { background: var(--cds-chart-muted); border-color: transparent; }
+.sc-pill { align-self: flex-start; font-size: var(--cds-font-size-caption); padding: 2px 8px; border-radius: 999px; border: 1px solid currentColor; }
+.sc-pill.ok { color: var(--color-ok); } .sc-pill.warn { color: var(--color-warn); } .sc-pill.bad { color: var(--color-bad); }
+.sc-scroll { overflow-x: auto; }
+.sc table { border-collapse: collapse; font-variant-numeric: tabular-nums; width: 100%; }
+.sc th, .sc td { padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--color-border-line); white-space: nowrap; }
+.sc th:first-child, .sc td:first-child { text-align: left; }
+.sc th { font-weight: var(--cds-font-weight-medium); color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); }
+.sc-grid td.wk { text-align: center; }
+.sc-cell { display: inline-block; min-width: 2.6em; padding: 3px 6px; border-radius: 4px; }
+.sc-cell.hit { background: var(--color-ok); color: var(--color-bg); }
+.sc-cell.miss { background: var(--cds-chart-muted); }
+.sc-cell.live { border: 1px dashed var(--color-fg-muted); }
+.sc-chart { position: relative; min-height: 300px; }
+.sc-chart svg text { fill: var(--cds-text-secondary); font-size: var(--cds-font-size-caption); }
+.sc-legend { display: flex; flex-wrap: wrap; gap: var(--cds-gap-md); font-size: var(--cds-font-size-caption); margin-bottom: var(--cds-gap-sm); }
+.sc-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sc-legend i { width: 12px; height: 3px; border-radius: 2px; display: inline-block; }
+.sc-tip { position: absolute; pointer-events: none; background: var(--cds-surface-popover); border: 1px solid var(--cds-border); box-shadow: var(--cds-shadow-popover); border-radius: var(--cds-radius); padding: 8px 10px; font-size: var(--cds-font-size-caption); font-variant-numeric: tabular-nums; min-width: 140px; }
+.sc-tip div { display: flex; justify-content: space-between; gap: 12px; }
+.sc-tip .d { color: var(--cds-text-secondary); margin-bottom: 4px; }
+.sc-yes { color: var(--color-ok); } .sc-no { color: var(--color-bad); } .sc-unk { color: var(--color-warn); }
+[data-dash-source-state=refreshing] { opacity: .5; }
+.sc-filters { display: flex; flex-wrap: wrap; gap: var(--cds-gap-md); align-items: flex-end; background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-md); }
+.sc-field { display: flex; flex-direction: column; gap: 4px; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); min-width: 0; }
+.sc-field input[type=date] { font: inherit; font-size: var(--cds-font-size-body); color: var(--color-fg); background: var(--color-bg); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: 6px 8px; }
+.sc-btn { font: inherit; font-size: var(--cds-font-size-body); color: var(--color-fg); background: transparent; border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: 6px 12px; cursor: pointer; }
+.sc-btn:hover { background: var(--color-bg); }
+.sc-click { cursor: pointer; text-decoration: underline dotted; }
+
+/* darker page, framed sections, ruled tables */
+.sc { --sc-line: color-mix(in srgb, var(--color-fg) 22%, var(--color-panel)); --sc-page: color-mix(in srgb, var(--color-bg) 91%, #000); --sc-head: color-mix(in srgb, var(--color-fg) 9%, var(--color-panel)); --sc-zebra: color-mix(in srgb, var(--color-fg) 4%, var(--color-panel));
+  background: var(--sc-page); padding: var(--cds-pad-lg); border-radius: var(--cds-radius); gap: var(--cds-gap-lg); }
+.sc-head, .sc-section, .sc-filters { background: var(--color-panel); border: 1px solid var(--sc-line); border-radius: var(--cds-radius); padding: var(--cds-pad-lg); }
+.sc-section > h2, .sc-section > .sc-row { padding-bottom: var(--cds-pad-sm); border-bottom: 1px solid var(--sc-line); }
+.sc-card { background: var(--sc-page); border-color: var(--sc-line); }
+.sc-dot { border-color: var(--sc-line); }
+.sc-scroll { border: 1px solid var(--sc-line); border-radius: var(--cds-radius); }
+.sc table { border-collapse: collapse; }
+.sc th, .sc td { border: 1px solid var(--sc-line); }
+.sc tr > :first-child { border-left: 0; } .sc tr > :last-child { border-right: 0; }
+.sc thead tr:first-child > * { border-top: 0; } .sc tbody tr:last-child > * { border-bottom: 0; }
+.sc thead th { background: var(--sc-head); color: var(--color-fg); }
+.sc tbody tr:nth-child(even) td { background: var(--sc-zebra); }
+.sc details > summary { cursor: pointer; font-weight: var(--cds-font-weight-medium); padding: var(--cds-pad-xs) 0; }
+.sc details[open] > summary { margin-bottom: var(--cds-gap-sm); }
+.sc-field input[type=date] { border-color: var(--sc-line); }
+.sc-btn { border-color: var(--sc-line); }
+
+/* own theme: dark by default, light via the toggle */
+#dash-root { --dash-gutter: 0; }
+.sc { --color-bg: #11141a; --color-panel: #181c23; --color-fg: #e7eaef; --color-fg-muted: #9ba4b0; --color-border-line: #2c333d;
+  --color-ok: #3fb37f; --color-warn: #e0a43a; --color-bad: #ef6464;
+  --cds-chart-grid: #262c35; --cds-chart-axis: #4a5361; --cds-chart-reference: #8a93a0; --cds-chart-muted: #2f3640;
+  --cds-text-secondary: #9ba4b0; --cds-surface-popover: #1f242c; --cds-border: #3a424e;
+  color-scheme: dark; color: var(--color-fg); min-height: 100%; }
+.sc.light { --color-bg: #f3f4f6; --color-panel: #ffffff; --color-fg: #1b1f24; --color-fg-muted: #5b6470; --color-border-line: #cdd2d9;
+  --color-ok: #1d8a5a; --color-warn: #a86b12; --color-bad: #c53030;
+  --cds-chart-grid: #e3e6ea; --cds-chart-axis: #a3aab4; --cds-chart-reference: #6b7480; --cds-chart-muted: #dfe3e8;
+  --cds-text-secondary: #5b6470; --cds-surface-popover: #ffffff; --cds-border: #cdd2d9; color-scheme: light; }
+.sc-titlebar { display: flex; align-items: center; justify-content: space-between; gap: var(--cds-gap-md); flex-wrap: wrap; }
+.sc .when-light { display: none; } .sc.light .when-light { display: inline; } .sc.light .when-dark { display: none; }
+
+.sc-seg { display: inline-flex; gap: 0; }
+.sc-seg .sc-btn { border-radius: 0; margin-left: -1px; padding: 4px 12px; font-size: var(--cds-font-size-caption); }
+.sc-seg .sc-btn:first-child { border-radius: var(--cds-radius) 0 0 var(--cds-radius); margin-left: 0; }
+.sc-seg .sc-btn:last-child { border-radius: 0 var(--cds-radius) var(--cds-radius) 0; }
+.sc-seg .sc-btn.on { background: var(--color-fg); color: var(--color-panel); border-color: var(--color-fg); }
+.sc-period { font-weight: var(--cds-font-weight-medium); color: var(--color-fg); }
+.sc-key { cursor: pointer; user-select: none; }
+.sc-key.dim { opacity: .4; }
+.sc-chart { min-height: 340px; }
+</style>
+
+<div class="sc" id="sc-page">
+  <header class="sc-head" id="title">
+    <div class="sc-titlebar">
+      <h1>Staying Fit &amp; Better Food Choices</h1>
+      <button type="button" class="sc-btn" id="theme-toggle" aria-label="Switch color mode"><span class="when-dark">Light mode</span><span class="when-light">Dark mode</span></button>
+    </div>
+    <p class="sc-lede">5,000 steps, 3 days a week (Mon–Sun). <span data-draw="lede">—</span></p>
+  </header>
+
+  <section class="sc-section" id="this-week">
+    <div class="sc-row"><h2>This week</h2><span class="sc-note" data-draw="weeklabel">—</span></div>
+    <div class="sc-cards" data-draw="cards" data-source="standings"></div>
+  </section>
+
+  <section class="sc-section" id="all-time">
+    <h2>All time</h2>
+    <div class="sc-scroll">
+      <table data-source="standings" data-row-key="name">
+        <thead><tr>
+          <th data-field="name">Name</th>
+          <th data-field="days_met">Days at 5,000+</th>
+          <th data-field="hit_rate">Hit rate</th>
+          <th data-field="weeks_hit">Weeks met</th>
+          <th data-field="week_streak">Week streak</th>
+          <th data-field="avg_steps">Avg per day</th>
+          <th data-field="total_steps">Total steps</th>
+          <th data-field="best_steps">Best day</th>
+        </tr></thead>
+        <tbody data-draw="stats"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="sc-filters" id="filters" aria-label="Filters">
+    <label class="sc-field">Week<select class="dash-select" id="week" data-draw="week" data-source="weekly"></select></label>
+    <label class="sc-field">From<input type="date" id="from" data-draw="from"></label>
+    <label class="sc-field">To<input type="date" id="to" data-draw="to"></label>
+    <label class="sc-field">Person<select class="dash-select" id="who" data-draw="who" data-source="standings"></select></label>
+    <button type="button" class="sc-btn" id="reset">Reset</button>
+    <span class="sc-note" data-draw="rangelabel">—</span>
+  </section>
+
+  <section class="sc-section" id="weekly-history">
+    <h2>By week</h2>
+    <p class="sc-note">Days at 5,000+. Green: goal met. Dashed: in progress.</p>
+    <div class="sc-scroll"><table class="sc-grid" data-draw="weekgrid" data-source="weekly"></table></div>
+  </section>
+
+  <section class="sc-section" id="daily-steps">
+    <div class="sc-row">
+      <h2>Daily steps</h2>
+      <div class="sc-seg" role="group" aria-label="Chart period">
+        <button type="button" class="sc-btn" data-span="week">Week</button>
+        <button type="button" class="sc-btn" data-span="month">Month</button>
+        <button type="button" class="sc-btn" data-span="range">Range</button>
+      </div>
+    </div>
+    <div class="sc-chart" data-draw="daily" data-source="log"></div>
+  </section>
+
+  <section class="sc-section" id="selected-dates">
+    <h2>Selected range</h2>
+    <div class="sc-scroll">
+      <table data-source="log">
+        <thead><tr><th>Name</th><th>Days logged</th><th>Days at 5,000+</th><th>Hit rate</th><th>Avg per day</th><th>Total steps</th><th>Best day</th></tr></thead>
+        <tbody data-draw="rangestats"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="sc-section" id="daily-log">
+    <details>
+      <summary>Daily log</summary>
+      <div class="sc-scroll">
+        <table data-source="log" data-row-key="date,name">
+          <thead><tr><th data-field="date">Date</th><th data-field="name">Name</th><th data-field="steps">Steps</th><th data-field="met">5,000+</th></tr></thead>
+          <tbody data-draw="logrows"></tbody>
+        </table>
+      </div>
+    </details>
+  </section>
+</div>
+
+<script>
+window.sc = window.sc || { who: '', from: '', to: '' };
+document.querySelectorAll('#theme-toggle').forEach((b) => b.addEventListener('click', () => {
+  document.querySelectorAll('#sc-page').forEach((p) => p.classList.toggle('light'));
+}));
+sc.inRange = (iso) => (!sc.from || iso >= sc.from) && (!sc.to || iso <= sc.to);
+sc.pick = (r) => sc.inRange(r.date) && (!sc.who || r.name === sc.who);
+sc.redraw = () => ['daily', 'weekgrid', 'rangestats', 'logrows', 'rangelabel', 'from', 'to', 'who', 'week'].forEach((n) => dash.draw(n));
+sc.parse = d3.utcParse('%Y-%m-%d');
+sc.fmtDay = d3.utcFormat('%a %b %-d');
+sc.fmtShort = d3.utcFormat('%b %-d');
+sc.num = d3.format(',');
+sc.monday = (iso) => { const d = d3.utcParse('%Y-%m-%d')(iso); return d3.utcFormat('%Y-%m-%d')(d3.utcMonday.floor(d)); };
+
+dash.calc('weekly', {
+  title: 'Days met per person per week',
+  description: 'For each Monday-to-Sunday week, how many days each person logged 5,000+ steps, and whether that reached the 3-day goal.',
+  inputs: ['log'],
+  fn: (log) => {
+    const monday = (iso) => d3.utcFormat('%Y-%m-%d')(d3.utcMonday.floor(d3.utcParse('%Y-%m-%d')(iso)));
+    const names = [...new Set(log.map((r) => r.name))];
+    const weeks = [...new Set(log.map((r) => monday(r.date)))].sort();
+    const current = weeks[weeks.length - 1];
+    const rows = [];
+    for (const week of weeks) for (const name of names) {
+      const days = log.filter((r) => r.name === name && monday(r.date) === week);
+      const days_met = days.filter((r) => r.met === 'YES').length;
+      rows.push({ week, name, days_met, days_logged: days.length, goal_met: days_met >= 3 ? 'yes' : 'no', in_progress: week === current ? 'yes' : 'no' });
+    }
+    return rows;
+  }
+});
+
+dash.calc('standings', {
+  title: 'Per-person totals',
+  description: 'Each person’s days met this week, all-time days at 5,000+, finished weeks with 3+ such days, streak of weeks, and step totals.',
+  inputs: ['log'],
+  fn: (log) => {
+    const monday = (iso) => d3.utcFormat('%Y-%m-%d')(d3.utcMonday.floor(d3.utcParse('%Y-%m-%d')(iso)));
+    const names = [...new Set(log.map((r) => r.name))];
+    const weeks = [...new Set(log.map((r) => monday(r.date)))].sort();
+    const current = weeks[weeks.length - 1];
+    const done = weeks.filter((w) => w !== current);
+    return names.map((name) => {
+      const mine = log.filter((r) => r.name === name);
+      const counted = mine.filter((r) => r.steps !== null && r.steps !== '');
+      const steps = counted.map((r) => +r.steps);
+      const metIn = (w) => mine.filter((r) => monday(r.date) === w && r.met === 'YES').length;
+      const this_week = metIn(current);
+      const weeks_hit = done.filter((w) => metIn(w) >= 3).length;
+      let week_streak = this_week >= 3 ? 1 : 0;
+      for (let i = done.length - 1; i >= 0 && metIn(done[i]) >= 3; i--) week_streak++;
+      const best = counted.reduce((a, r) => (a && +a.steps >= +r.steps ? a : r), null);
+      const days_met = mine.filter((r) => r.met === 'YES').length;
+      return {
+        name, this_week, days_met, days_logged: mine.length,
+        hit_rate: mine.length ? Math.round((100 * days_met) / mine.length) : 0,
+        weeks_hit, weeks_done: done.length, week_streak,
+        avg_steps: steps.length ? Math.round(d3.mean(steps)) : null,
+        total_steps: d3.sum(steps),
+        best_steps: best ? +best.steps : null, best_date: best ? best.date : null
+      };
+    });
+  }
+});
+
+dash.calc('summary', {
+  title: 'This week at a glance',
+  description: 'The current week’s dates and how many people have already met the 3-day goal.',
+  inputs: ['log'],
+  fn: (log) => {
+    const dates = log.map((r) => r.date).sort();
+    const latest = dates[dates.length - 1];
+    const week_start = d3.utcFormat('%Y-%m-%d')(d3.utcMonday.floor(d3.utcParse('%Y-%m-%d')(latest)));
+    const names = [...new Set(log.map((r) => r.name))];
+    const met = (n) => log.filter((r) => r.name === n && r.date >= week_start && r.met === 'YES').length;
+    return [{ week_start, latest_date: latest, members: names.length, hit_count: names.filter((n) => met(n) >= 3).length }];
+  }
+});
+
+dash.draw('lede', (el) => {
+  const s = dash.data('summary');
+  if (s.status !== 'ok' || !s.data || !s.data.length) { el.textContent = '—'; return; }
+  const r = s.data[0];
+  el.replaceChildren();
+  const b1 = document.createElement('b');
+  b1.dataset.source = 'summary'; b1.dataset.field = 'hit_count'; b1.dataset.row = '0';
+  b1.textContent = r.hit_count;
+  const b2 = document.createElement('b');
+  b2.dataset.source = 'summary'; b2.dataset.field = 'members'; b2.dataset.row = '0';
+  b2.textContent = r.members;
+  el.append(b1, ' of ', b2, ' met this week.');
+});
+
+dash.draw('weeklabel', (el) => {
+  const s = dash.data('summary');
+  if (s.status !== 'ok' || !s.data || !s.data.length) { el.textContent = '—'; return; }
+  const start = sc.parse(s.data[0].week_start);
+  el.textContent = sc.fmtShort(start) + ' – ' + sc.fmtShort(d3.utcDay.offset(start, 6));
+});
+
+dash.draw('cards', (el) => {
+  const s = dash.data('standings'), lg = dash.data('log'), sm = dash.data('summary');
+  if (s.status !== 'ok' || !s.data || lg.status !== 'ok' || sm.status !== 'ok' || !sm.data) { el.replaceChildren(); return; }
+  const start = sm.data[0].week_start, latest = sm.data[0].latest_date;
+  const days = d3.range(7).map((i) => d3.utcFormat('%Y-%m-%d')(d3.utcDay.offset(sc.parse(start), i)));
+  const letters = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  el.replaceChildren(...[...s.data].sort((a, b) => b.this_week - a.this_week || d3.ascending(a.name, b.name)).map((p) => {
+    const card = document.createElement('div'); card.className = 'sc-card'; card.id = 'card-' + p.name.replace(/\W+/g, '-');
+    const nm = document.createElement('div'); nm.className = 'sc-card-name'; nm.textContent = p.name;
+    const big = document.createElement('div'); big.className = 'sc-big';
+    const v = document.createElement('span'); v.dataset.source = 'standings'; v.dataset.field = 'this_week'; v.dataset.where = 'name=' + encodeURIComponent(p.name).replace(/%20/g, ' ');
+    v.textContent = p.this_week;
+    const of = document.createElement('small'); of.textContent = ' / 3';
+    big.append(v, of);
+    const dots = document.createElement('div'); dots.className = 'sc-dots';
+    days.forEach((d, i) => {
+      const row = lg.data.find((r) => r.name === p.name && r.date === d);
+      const dot = document.createElement('span');
+      dot.className = 'sc-dot' + (row ? (row.met === 'YES' ? ' met' : ' miss') : '');
+      dot.textContent = letters[i];
+      dot.title = sc.fmtDay(sc.parse(d)) + (row ? ': ' + (row.steps ? sc.num(+row.steps) + ' steps' : 'unknown') : (d > latest ? ': not yet' : ': not logged'));
+      dots.append(dot);
+    });
+    const left = days.filter((d) => d > latest).length;
+    const pill = document.createElement('span');
+    if (p.this_week >= 3) { pill.className = 'sc-pill ok'; pill.textContent = 'Goal met'; }
+    else if (3 - p.this_week <= left) { pill.className = 'sc-pill warn'; pill.textContent = (3 - p.this_week) + ' to go'; }
+    else { pill.className = 'sc-pill bad'; pill.textContent = 'Missed'; }
+    card.append(nm, big, dots, pill);
+    return card;
+  }));
+});
+
+dash.draw('weekgrid', (el) => {
+  const w = dash.data('weekly');
+  if (w.status !== 'ok' || !w.data) { el.replaceChildren(); return; }
+  const allWeeks = [...new Set(w.data.map((r) => r.week))].sort();
+  const sunday = (wk) => d3.utcFormat('%Y-%m-%d')(d3.utcDay.offset(sc.parse(wk), 6));
+  const weeks = allWeeks.filter((wk) => (!sc.to || wk <= sc.to) && (!sc.from || sunday(wk) >= sc.from));
+  const names = [...new Set(w.data.map((r) => r.name))].sort().filter((n) => !sc.who || n === sc.who);
+  if (!weeks.length) { el.replaceChildren(); return; }
+  const thead = document.createElement('thead'), hr = document.createElement('tr');
+  const h0 = document.createElement('th'); h0.textContent = 'Name'; hr.append(h0);
+  weeks.forEach((wk) => {
+    const th = document.createElement('th'); th.className = 'wk sc-click'; th.textContent = sc.fmtShort(sc.parse(wk));
+    th.tabIndex = 0; th.title = 'Show this week';
+    const pickWeek = () => { sc.from = wk; sc.to = sunday(wk); sc.redraw(); };
+    th.onclick = pickWeek; th.onkeydown = (e) => { if (e.key === 'Enter') pickWeek(); };
+    hr.append(th);
+  });
+  const ht = document.createElement('th'); ht.textContent = 'Weeks met'; hr.append(ht);
+  thead.append(hr);
+  const tbody = document.createElement('tbody');
+  names.forEach((n) => {
+    const tr = document.createElement('tr');
+    const td0 = document.createElement('td'); td0.textContent = n; tr.append(td0);
+    weeks.forEach((wk) => {
+      const r = w.data.find((x) => x.week === wk && x.name === n);
+      const td = document.createElement('td'); td.className = 'wk';
+      const c = document.createElement('span');
+      c.className = 'sc-cell ' + (r.goal_met === 'yes' ? 'hit' : 'miss') + (r.in_progress === 'yes' ? ' live' : '');
+      c.dataset.source = 'weekly'; c.dataset.field = 'days_met';
+      c.dataset.where = 'week=' + wk + '&name=' + encodeURIComponent(n).replace(/%20/g, ' ');
+      c.textContent = r.days_met;
+      c.title = n + ', week of ' + sc.fmtShort(sc.parse(wk)) + ': ' + r.days_met + ' of ' + r.days_logged + ' logged days at 5,000+';
+      td.append(c); tr.append(td);
+    });
+    const tdt = document.createElement('td');
+    tdt.dataset.source = 'standings'; tdt.dataset.field = 'weeks_hit'; tdt.dataset.where = 'name=' + encodeURIComponent(n).replace(/%20/g, ' ');
+    tdt.textContent = w.data.filter((x) => x.name === n && x.goal_met === 'yes' && x.in_progress === 'no').length;
+    tr.append(tdt); tbody.append(tr);
+  });
+  el.replaceChildren(thead, tbody);
+});
+
+dash.draw('who', (sel) => {
+  const s = dash.data('standings');
+  const names = s.status === 'ok' && s.data ? s.data.map((r) => r.name).sort() : [];
+  sel.replaceChildren(new Option('Everyone', ''), ...names.map((n) => new Option(n, n)));
+  sel.value = names.includes(sc.who) ? sc.who : '';
+  sel.onchange = () => { sc.who = sel.value; sc.redraw(); };
+});
+
+dash.draw('week', (sel) => {
+  const w = dash.data('weekly');
+  const weeks = w.status === 'ok' && w.data ? [...new Set(w.data.map((r) => r.week))].sort().reverse() : [];
+  const sun = (wk) => d3.utcFormat('%Y-%m-%d')(d3.utcDay.offset(sc.parse(wk), 6));
+  const label = (wk) => sc.fmtShort(sc.parse(wk)) + ' – ' + sc.fmtShort(d3.utcDay.offset(sc.parse(wk), 6));
+  sel.replaceChildren(new Option('All', ''), ...weeks.map((wk) => new Option(label(wk), wk)));
+  const match = weeks.find((wk) => sc.from === wk && sc.to === sun(wk));
+  sel.value = match || '';
+  if (!match && (sc.from || sc.to)) { const o = new Option('Custom', 'custom'); sel.append(o); sel.value = 'custom'; }
+  sel.onchange = () => {
+    if (sel.value === 'custom') return;
+    sc.from = sel.value; sc.to = sel.value ? sun(sel.value) : '';
+    sc.redraw();
+  };
+});
+
+['from', 'to'].forEach((key) => dash.draw(key, (inp) => {
+  const lg = dash.data('log');
+  const dates = lg.status === 'ok' ? lg.data.map((r) => r.date).sort() : [];
+  if (dates.length) { inp.min = dates[0]; inp.max = dates[dates.length - 1]; }
+  inp.value = sc[key];
+  inp.onchange = () => {
+    sc[key] = inp.value;
+    if (sc.from && sc.to && sc.from > sc.to) { if (key === 'from') sc.to = sc.from; else sc.from = sc.to; }
+    sc.redraw();
+  };
+}));
+
+dash.draw('rangelabel', (el) => {
+  document.querySelectorAll('#reset').forEach((b) => { b.onclick = () => { sc.from = ''; sc.to = ''; sc.who = ''; sc.redraw(); }; });
+  const lg = dash.data('log');
+  if (lg.status !== 'ok') { el.textContent = '—'; return; }
+  const days = new Set(lg.data.filter((r) => sc.inRange(r.date)).map((r) => r.date)).size;
+  el.textContent = days + (days === 1 ? ' day' : ' days');
+});
+
+dash.draw('rangestats', (tb) => {
+  const lg = dash.data('log');
+  if (lg.status !== 'ok') { tb.replaceChildren(); return; }
+  const rows = lg.data.filter(sc.pick);
+  const names = [...new Set(rows.map((r) => r.name))];
+  const stats = names.map((n) => {
+    const mine = rows.filter((r) => r.name === n);
+    const counted = mine.filter((r) => r.steps !== null && r.steps !== '');
+    const met = mine.filter((r) => r.met === 'YES').length;
+    const best = counted.reduce((a, r) => (a && +a.steps >= +r.steps ? a : r), null);
+    return { n, logged: mine.length, met, rate: mine.length ? Math.round((100 * met) / mine.length) : 0,
+      avg: counted.length ? Math.round(d3.mean(counted, (r) => +r.steps)) : null, total: d3.sum(counted, (r) => +r.steps), best };
+  }).sort((a, b) => b.met - a.met || (b.total - a.total));
+  if (!stats.length) {
+    const tr = document.createElement('tr'); const td = document.createElement('td'); td.colSpan = 7; td.textContent = 'No data'; tr.append(td);
+    tb.replaceChildren(tr); return;
+  }
+  tb.replaceChildren(...stats.map((p) => {
+    const tr = document.createElement('tr');
+    [p.n, p.logged, p.met, p.rate + '%', p.avg === null ? '—' : sc.num(p.avg), sc.num(p.total), p.best ? sc.num(+p.best.steps) + ' (' + sc.fmtShort(sc.parse(p.best.date)) + ')' : '—']
+      .forEach((v) => { const td = document.createElement('td'); td.textContent = v; tr.append(td); });
+    return tr;
+  }));
+});
+
+dash.draw('daily', (el) => {
+  sc.span = sc.span || 'week';
+  document.querySelectorAll('[data-span]').forEach((b) => {
+    b.classList.toggle('on', b.dataset.span === sc.span);
+    b.setAttribute('aria-pressed', String(b.dataset.span === sc.span));
+    b.onclick = () => { sc.span = b.dataset.span; sc.hl = null; dash.draw('daily'); };
+  });
+  const lg = dash.data('log');
+  if (lg.status !== 'ok') { el.textContent = lg.status === 'error' ? 'Failed to load' : '—'; return; }
+  const GOAL = 5000;
+  const iso = d3.utcFormat('%Y-%m-%d');
+  const logged = lg.data.filter((r) => r.steps !== null && r.steps !== '');
+  if (!logged.length) { el.textContent = 'No data'; return; }
+  const names = [...new Set(lg.data.map((r) => r.name))].sort();
+  const shown = sc.who ? [sc.who] : names;
+  const color = (n) => dash.colors[names.indexOf(n) % dash.colors.length];
+  const allDates = lg.data.map((r) => r.date).sort();
+  const todayIso = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date());
+  const anchor = sc.parse(sc.from || todayIso);
+  let start, end;
+  if (sc.span === 'week') { start = d3.utcMonday.floor(anchor); end = d3.utcDay.offset(start, 6); }
+  else if (sc.span === 'month') { start = d3.utcMonth.floor(anchor); end = d3.utcDay.offset(d3.utcMonth.offset(start, 1), -1); }
+  else { start = sc.parse(sc.from || allDates[0]); end = sc.parse(sc.to || allDates[allDates.length - 1]); }
+  const days = d3.utcDay.range(start, d3.utcDay.offset(end, 1));
+  const byKey = new Map(logged.map((r) => [r.name + '|' + r.date, +r.steps]));
+  const series = shown.map((n) => ({ n, pts: days.map((d) => ({ date: d, steps: byKey.has(n + '|' + iso(d)) ? byKey.get(n + '|' + iso(d)) : null })) }));
+
+  el.replaceChildren();
+  const head = document.createElement('div'); head.className = 'sc-legend';
+  const period = document.createElement('span'); period.className = 'sc-period';
+  period.textContent = sc.fmtShort(start) + ' – ' + sc.fmtShort(end);
+  head.append(period);
+  series.forEach((s) => {
+    const sp = document.createElement('span'); sp.className = 'sc-key'; sp.tabIndex = 0;
+    const i = document.createElement('i'); i.style.background = color(s.n); sp.append(i, s.n);
+    sp.onclick = () => { sc.hl = sc.hl === s.n ? null : s.n; paint(); };
+    head.append(sp);
+  });
+  const gl = document.createElement('span'); const gi = document.createElement('i'); gi.style.background = 'var(--cds-chart-reference)'; gl.append(gi, '5,000'); head.append(gl);
+  el.append(head);
+
+  const W = Math.max(300, el.clientWidth), H = 300, m = { t: 26, r: 40, b: 30, l: 44 };
+  const x = d3.scaleUtc().domain(days.length > 1 ? [start, end] : [d3.utcDay.offset(start, -1), d3.utcDay.offset(start, 1)]).range([m.l + 10, W - m.r - 10]);
+  const vals = series.flatMap((s) => s.pts.filter((p) => p.steps !== null).map((p) => p.steps));
+  const y = d3.scaleLinear().domain([0, Math.max(GOAL * 1.2, d3.max(vals) || 0)]).nice().range([H - m.b, m.t]);
+  const step = Math.max(1, Math.ceil(days.length / Math.max(2, Math.floor((W - m.l - m.r) / 58))));
+  const tf = sc.span === 'week' ? d3.utcFormat('%a %-d') : d3.utcFormat('%b %-d');
+  const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img')
+    .attr('aria-label', 'Daily steps' + (sc.who ? ' for ' + sc.who : ' per person') + ' from ' + sc.fmtShort(start) + ' to ' + sc.fmtShort(end) + ', with a line at 5,000 steps');
+  svg.append('g').attr('transform', `translate(0,${H - m.b})`)
+    .call(d3.axisBottom(x).tickValues(days.filter((_, i) => i % step === 0)).tickFormat(tf).tickSizeOuter(0))
+    .call((g) => g.select('.domain').style('stroke', 'var(--cds-chart-axis)')).call((g) => g.selectAll('line').style('stroke', 'var(--cds-chart-axis)'));
+  svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5).tickFormat(d3.format('~s')).tickSize(-(W - m.l - m.r)))
+    .call((g) => g.select('.domain').remove()).call((g) => g.selectAll('line').style('stroke', 'var(--cds-chart-grid)'));
+  svg.append('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', y(GOAL)).attr('y2', y(GOAL))
+    .style('stroke', 'var(--cds-chart-reference)').style('stroke-dasharray', '4 3').style('stroke-width', 1.5);
+  // today marker in week/month view
+  const today = sc.parse(todayIso);
+  if (today >= start && today <= end) svg.append('line').attr('x1', x(today)).attr('x2', x(today)).attr('y1', m.t).attr('y2', H - m.b)
+    .style('stroke', 'var(--cds-chart-grid)').style('stroke-width', 6).style('opacity', 0.6);
+
+  const rule = svg.append('line').attr('y1', m.t).attr('y2', H - m.b).style('stroke', 'var(--cds-chart-axis)').style('display', 'none');
+  const overlay = svg.append('rect').attr('x', m.l).attr('y', m.t).attr('width', W - m.l - m.r).attr('height', H - m.t - m.b).style('fill', 'transparent');
+  const line = d3.line().defined((p) => p.steps !== null).x((p) => x(p.date)).y((p) => y(p.steps));
+  const groups = series.map((s) => {
+    const g = svg.append('g');
+    g.append('path').datum(s.pts).attr('d', line).style('fill', 'none').style('stroke', color(s.n)).style('stroke-width', 2.25).style('stroke-linejoin', 'round');
+    g.append('g').selectAll('circle').data(s.pts.filter((p) => p.steps !== null)).join('circle')
+      .attr('cx', (p) => x(p.date)).attr('cy', (p) => y(p.steps)).attr('r', 3.5).style('fill', color(s.n)).style('stroke', 'var(--color-panel)').style('stroke-width', 1.5);
+    g.append('path').datum(s.pts).attr('d', line).style('fill', 'none').style('stroke', 'transparent').style('stroke-width', 16).style('cursor', 'pointer')
+      .on('pointerenter', () => { sc.hover = s.n; paint(); })
+      .on('pointerleave', () => { sc.hover = null; paint(); });
+    g.selectAll('circle').style('cursor', 'pointer')
+      .on('pointerenter', () => { sc.hover = s.n; paint(); })
+      .on('pointerleave', () => { sc.hover = null; paint(); });
+    return { s, g };
+  });
+  const labels = svg.append('g').style('pointer-events', 'none');
+  const label = (tx, ty, text, fill, anchorPos) => labels.append('text').attr('x', tx).attr('y', ty).attr('text-anchor', anchorPos || 'middle')
+    .attr('dominant-baseline', 'middle').text(text)
+    .style('fill', fill).style('font-size', '12px').style('font-weight', 600).style('font-variant-numeric', 'tabular-nums')
+    .style('paint-order', 'stroke').style('stroke', 'var(--color-panel)').style('stroke-width', 4).style('stroke-linejoin', 'round');
+
+  function paint(day) {
+    labels.selectAll('*').remove();
+    const focus = sc.hover || sc.hl;
+    groups.forEach(({ s, g }) => g.style('opacity', focus && focus !== s.n ? 0.15 : 1));
+    head.querySelectorAll('.sc-key').forEach((k) => k.classList.toggle('dim', !!focus && k.textContent !== focus));
+    if (focus) {
+      rule.style('display', 'none');
+      const s = series.find((q) => q.n === focus);
+      const pts = s ? s.pts.filter((p) => p.steps !== null) : [];
+      const tight = pts.length > 1 && (x(pts[1].date) - x(pts[0].date)) < 44;
+      pts.forEach((p, i) => label(x(p.date), y(p.steps) + (tight && i % 2 ? 16 : -12), sc.num(p.steps), color(focus)));
+      return;
+    }
+    if (!day) { rule.style('display', 'none'); return; }
+    const sx = x(day);
+    rule.attr('x1', sx).attr('x2', sx).style('display', null);
+    label(Math.min(Math.max(sx, m.l + 30), W - m.r - 30), 12, sc.fmtDay(day), 'var(--color-fg)');
+    const pts = series.map((s) => ({ s, v: s.pts.find((p) => +p.date === +day).steps })).filter((q) => q.v !== null)
+      .map((q) => ({ ...q, ty: y(q.v) })).sort((a, b) => a.ty - b.ty);
+    for (let i = 1; i < pts.length; i++) pts[i].ty = Math.max(pts[i].ty, pts[i - 1].ty + 14);
+    const over = pts.length ? pts[pts.length - 1].ty - (H - m.b - 4) : 0;
+    if (over > 0) pts.forEach((q) => { q.ty = Math.max(m.t + 4, q.ty - over); });
+    const right = sx < W * 0.62;
+    pts.forEach((q) => label(sx + (right ? 9 : -9), q.ty, (shown.length > 1 ? q.s.n + ' ' : '') + sc.num(q.v), color(q.s.n), right ? 'start' : 'end'));
+  }
+  overlay.on('pointermove', (ev) => {
+    const t = +x.invert(d3.pointer(ev)[0]);
+    const day = days.reduce((a, b) => (Math.abs(b - t) < Math.abs(a - t) ? b : a), days[0]);
+    paint(day);
+  }).on('pointerleave', () => paint());
+  paint();
+});
+
+dash.draw('stats', (tb) => {
+  const s = dash.data('standings');
+  if (s.status !== 'ok' || !s.data) { tb.replaceChildren(); return; }
+  const fmt = (v) => (v === null ? '—' : sc.num(v));
+  tb.replaceChildren(...[...s.data].sort((a, b) => b.days_met - a.days_met || d3.ascending(a.name, b.name)).map((p) => {
+    const tr = document.createElement('tr');
+    const cells = [p.name, p.days_met, p.hit_rate + '%', p.weeks_hit, p.week_streak, fmt(p.avg_steps), fmt(p.total_steps), fmt(p.best_steps)];
+    cells.forEach((c) => { const td = document.createElement('td'); td.textContent = c; tr.append(td); });
+    return tr;
+  }));
+});
+
+dash.draw('logrows', (tb) => {
+  const lg = dash.data('log');
+  if (lg.status !== 'ok') { tb.replaceChildren(); return; }
+  tb.replaceChildren(...lg.data.filter(sc.pick).sort((a, b) => d3.descending(a.date, b.date) || d3.ascending(a.name, b.name)).map((r) => {
+    const tr = document.createElement('tr');
+    tr.dataset.key = encodeURIComponent(r.date) + ',' + encodeURIComponent(r.name).replace(/%20/g, ' ');
+    const vals = [sc.fmtDay(sc.parse(r.date)), r.name, r.steps ? sc.num(+r.steps) : 'unknown', r.met === 'YES' ? 'Yes' : r.met === 'NO' ? 'No' : 'Check'];
+    vals.forEach((v, i) => { const td = document.createElement('td'); td.textContent = v; if (i === 3) td.className = r.met === 'YES' ? 'sc-yes' : r.met === 'NO' ? 'sc-no' : 'sc-unk'; tr.append(td); });
+    return tr;
+  }));
+});
+</script>
+<p class="sc-updated" id="updated"></p>
+</div>
+<script>
+// keep the page background in step with the light/dark toggle
+document.getElementById('theme-toggle').addEventListener('click', () => {
+  document.body.classList.toggle('light', document.getElementById('sc-page').classList.contains('light'));
+});
+let resizeT; window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => dash.draw('daily'), 150); });
+dash._load().then(() => {
+  const lg = dash.data('log');
+  if (lg.status === 'ok' && lg.data.length) {
+    const last = lg.data.map((r) => r.date).sort().pop();
+    document.getElementById('updated').textContent = 'Steps through ' + d3.utcFormat('%A, %B %-d')(d3.utcParse('%Y-%m-%d')(last)) + '. Updated daily.';
+  }
+});
+</script>
+</body>
+</html>
