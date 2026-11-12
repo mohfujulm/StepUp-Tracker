@@ -358,9 +358,8 @@ dash.draw('cards', (el) => {
   const start = sm.data[0].week_start, latest = sm.data[0].latest_date;
   const days = d3.range(7).map((i) => d3.utcFormat('%Y-%m-%d')(d3.utcDay.offset(sc.parse(start), i)));
   const letters = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-  const gold = sc.goldNames();
   el.replaceChildren(...[...s.data].sort((a, b) => b.this_week - a.this_week || d3.ascending(a.name, b.name)).map((p) => {
-    const isGold = gold.has(p.name);
+    const isGold = days.filter((d) => lg.data.some((r) => r.name === p.name && r.date === d && +r.steps >= sc.GOLD)).length >= 2;
     const card = document.createElement('div'); card.className = 'sc-card' + (isGold ? ' gold-card' : ''); card.id = 'card-' + p.name.replace(/\W+/g, '-');
     const nm = document.createElement('div'); nm.className = 'sc-card-name' + (isGold ? ' gold' : ''); nm.textContent = p.name;
     const big = document.createElement('div'); big.className = 'sc-big';
