@@ -153,6 +153,11 @@ window.dash = (function () {
 .sc-key { cursor: pointer; user-select: none; }
 .sc-key.dim { opacity: .4; }
 .sc-chart { min-height: 340px; }
+.sc { --sc-gold: #ffc83d; } .sc.light { --sc-gold: #b07d00; }
+.sc .gold { color: var(--sc-gold); font-weight: 600; }
+.sc-card.gold-card { border-color: var(--sc-gold); box-shadow: inset 0 0 0 1px var(--sc-gold); }
+.sc-dot.gold { background: var(--sc-gold); border-color: var(--sc-gold); color: #1b1f24; font-weight: 600; }
+.sc-key-gold { display: inline-flex; align-items: center; gap: 6px; }
 </style>
 
 <div class="sc" id="sc-page">
@@ -250,6 +255,14 @@ sc.parse = d3.utcParse('%Y-%m-%d');
 sc.fmtDay = d3.utcFormat('%a %b %-d');
 sc.fmtShort = d3.utcFormat('%b %-d');
 sc.num = d3.format(',');
+sc.GOLD = 10000;
+// names at 10,000+ on the latest logged day
+sc.goldNames = () => {
+  const lg = dash.data('log');
+  if (lg.status !== 'ok' || !lg.data || !lg.data.length) return new Set();
+  const last = lg.data.map((r) => r.date).sort().pop();
+  return new Set(lg.data.filter((r) => r.date === last && +r.steps >= sc.GOLD).map((r) => r.name));
+};
 sc.monday = (iso) => { const d = d3.utcParse('%Y-%m-%d')(iso); return d3.utcFormat('%Y-%m-%d')(d3.utcMonday.floor(d)); };
 
 dash.calc('weekly', {
@@ -345,9 +358,11 @@ dash.draw('cards', (el) => {
   const start = sm.data[0].week_start, latest = sm.data[0].latest_date;
   const days = d3.range(7).map((i) => d3.utcFormat('%Y-%m-%d')(d3.utcDay.offset(sc.parse(start), i)));
   const letters = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  const gold = sc.goldNames();
   el.replaceChildren(...[...s.data].sort((a, b) => b.this_week - a.this_week || d3.ascending(a.name, b.name)).map((p) => {
-    const card = document.createElement('div'); card.className = 'sc-card'; card.id = 'card-' + p.name.replace(/\W+/g, '-');
-    const nm = document.createElement('div'); nm.className = 'sc-card-name'; nm.textContent = p.name;
+    const isGold = gold.has(p.name);
+    const card = document.createElement('div'); card.className = 'sc-card' + (isGold ? ' gold-card' : ''); card.id = 'card-' + p.name.replace(/\W+/g, '-');
+    const nm = document.createElement('div'); nm.className = 'sc-card-name' + (isGold ? ' gold' : ''); nm.textContent = p.name;
     const big = document.createElement('div'); big.className = 'sc-big';
     const v = document.createElement('span'); v.dataset.source = 'standings'; v.dataset.field = 'this_week'; v.dataset.where = 'name=' + encodeURIComponent(p.name).replace(/%20/g, ' ');
     v.textContent = p.this_week;
@@ -357,7 +372,7 @@ dash.draw('cards', (el) => {
     days.forEach((d, i) => {
       const row = lg.data.find((r) => r.name === p.name && r.date === d);
       const dot = document.createElement('span');
-      dot.className = 'sc-dot' + (row ? (row.met === 'YES' ? ' met' : ' miss') : '');
+      dot.className = 'sc-dot' + (row ? (+row.steps >= sc.GOLD ? ' gold' : row.met === 'YES' ? ' met' : ' miss') : '');
       dot.textContent = letters[i];
       dot.title = sc.fmtDay(sc.parse(d)) + (row ? ': ' + (row.steps ? sc.num(+row.steps) + ' steps' : 'unknown') : (d > latest ? ': not yet' : ': not logged'));
       dots.append(dot);
@@ -380,6 +395,7 @@ dash.draw('weekgrid', (el) => {
   const weeks = allWeeks.filter((wk) => (!sc.to || wk <= sc.to) && (!sc.from || sunday(wk) >= sc.from));
   const names = [...new Set(w.data.map((r) => r.name))].sort().filter((n) => !sc.who || n === sc.who);
   if (!weeks.length) { el.replaceChildren(); return; }
+  const goldW = sc.goldNames();
   const thead = document.createElement('thead'), hr = document.createElement('tr');
   const h0 = document.createElement('th'); h0.textContent = 'Name'; hr.append(h0);
   weeks.forEach((wk) => {
@@ -394,7 +410,7 @@ dash.draw('weekgrid', (el) => {
   const tbody = document.createElement('tbody');
   names.forEach((n) => {
     const tr = document.createElement('tr');
-    const td0 = document.createElement('td'); td0.textContent = n; tr.append(td0);
+    const td0 = document.createElement('td'); td0.textContent = n; if (goldW.has(n)) td0.className = 'gold'; tr.append(td0);
     weeks.forEach((wk) => {
       const r = w.data.find((x) => x.week === wk && x.name === n);
       const td = document.createElement('td'); td.className = 'wk';
@@ -462,6 +478,7 @@ dash.draw('rangestats', (tb) => {
   const lg = dash.data('log');
   if (lg.status !== 'ok') { tb.replaceChildren(); return; }
   const rows = lg.data.filter(sc.pick);
+  const goldR = sc.goldNames();
   const names = [...new Set(rows.map((r) => r.name))];
   const stats = names.map((n) => {
     const mine = rows.filter((r) => r.name === n);
@@ -478,7 +495,7 @@ dash.draw('rangestats', (tb) => {
   tb.replaceChildren(...stats.map((p) => {
     const tr = document.createElement('tr');
     [p.n, p.logged, p.met, p.rate + '%', p.avg === null ? '—' : sc.num(p.avg), sc.num(p.total), p.best ? sc.num(+p.best.steps) + ' (' + sc.fmtShort(sc.parse(p.best.date)) + ')' : '—']
-      .forEach((v) => { const td = document.createElement('td'); td.textContent = v; tr.append(td); });
+      .forEach((v, i) => { const td = document.createElement('td'); td.textContent = v; if (i === 0 && goldR.has(p.n)) td.className = 'gold'; if (i === 6 && p.best && +p.best.steps >= sc.GOLD) td.className = 'gold'; tr.append(td); });
     return tr;
   }));
 });
@@ -551,7 +568,7 @@ dash.draw('daily', (el) => {
     const g = svg.append('g');
     g.append('path').datum(s.pts).attr('d', line).style('fill', 'none').style('stroke', color(s.n)).style('stroke-width', 2.25).style('stroke-linejoin', 'round');
     g.append('g').selectAll('circle').data(s.pts.filter((p) => p.steps !== null)).join('circle')
-      .attr('cx', (p) => x(p.date)).attr('cy', (p) => y(p.steps)).attr('r', 3.5).style('fill', color(s.n)).style('stroke', 'var(--color-panel)').style('stroke-width', 1.5);
+      .attr('cx', (p) => x(p.date)).attr('cy', (p) => y(p.steps)).attr('r', (p) => (p.steps >= sc.GOLD ? 5 : 3.5)).style('fill', (p) => (p.steps >= sc.GOLD ? 'var(--sc-gold)' : color(s.n))).style('stroke', (p) => (p.steps >= sc.GOLD ? color(s.n) : 'var(--color-panel)')).style('stroke-width', (p) => (p.steps >= sc.GOLD ? 2 : 1.5));
     g.append('path').datum(s.pts).attr('d', line).style('fill', 'none').style('stroke', 'transparent').style('stroke-width', 16).style('cursor', 'pointer')
       .on('pointerenter', () => { sc.hover = s.n; paint(); })
       .on('pointerleave', () => { sc.hover = null; paint(); });
@@ -603,10 +620,11 @@ dash.draw('stats', (tb) => {
   const s = dash.data('standings');
   if (s.status !== 'ok' || !s.data) { tb.replaceChildren(); return; }
   const fmt = (v) => (v === null ? '—' : sc.num(v));
+  const goldS = sc.goldNames();
   tb.replaceChildren(...[...s.data].sort((a, b) => b.days_met - a.days_met || d3.ascending(a.name, b.name)).map((p) => {
     const tr = document.createElement('tr');
     const cells = [p.name, p.days_met, p.hit_rate + '%', p.weeks_hit, p.week_streak, fmt(p.avg_steps), fmt(p.total_steps), fmt(p.best_steps)];
-    cells.forEach((c) => { const td = document.createElement('td'); td.textContent = c; tr.append(td); });
+    cells.forEach((c, i) => { const td = document.createElement('td'); td.textContent = c; if (i === 0 && goldS.has(p.name)) td.className = 'gold'; if (i === 7 && p.best_steps >= sc.GOLD) td.className = 'gold'; tr.append(td); });
     return tr;
   }));
 });
@@ -618,7 +636,8 @@ dash.draw('logrows', (tb) => {
     const tr = document.createElement('tr');
     tr.dataset.key = encodeURIComponent(r.date) + ',' + encodeURIComponent(r.name).replace(/%20/g, ' ');
     const vals = [sc.fmtDay(sc.parse(r.date)), r.name, r.steps ? sc.num(+r.steps) : 'unknown', r.met === 'YES' ? 'Yes' : r.met === 'NO' ? 'No' : 'Check'];
-    vals.forEach((v, i) => { const td = document.createElement('td'); td.textContent = v; if (i === 3) td.className = r.met === 'YES' ? 'sc-yes' : r.met === 'NO' ? 'sc-no' : 'sc-unk'; tr.append(td); });
+    const big = +r.steps >= sc.GOLD;
+    vals.forEach((v, i) => { const td = document.createElement('td'); td.textContent = v; if (big && (i === 1 || i === 2)) td.className = 'gold'; if (i === 3) td.className = r.met === 'YES' ? 'sc-yes' : r.met === 'NO' ? 'sc-no' : 'sc-unk'; tr.append(td); });
     return tr;
   }));
 });
