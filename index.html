@@ -157,6 +157,9 @@ window.dash = (function () {
 .sc .gold { color: var(--sc-gold); font-weight: 600; }
 .sc-card.gold-card { border-color: var(--sc-gold); box-shadow: inset 0 0 0 1px var(--sc-gold); }
 .sc-card.done-card { border-color: var(--color-ok); box-shadow: inset 0 0 0 1px var(--color-ok); }
+.sc-card-top { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+.sc-rank { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); font-variant-numeric: tabular-nums; }
+.sc-wk-total { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); font-variant-numeric: tabular-nums; }
 .sc-dot.gold { background: var(--sc-gold); border-color: var(--sc-gold); color: #1b1f24; font-weight: 600; }
 .sc-key-gold { display: inline-flex; align-items: center; gap: 6px; }
 
@@ -392,10 +395,17 @@ dash.draw('cards', (el) => {
   const start = sm.data[0].week_start, latest = sm.data[0].latest_date;
   const days = d3.range(7).map((i) => d3.utcFormat('%Y-%m-%d')(d3.utcDay.offset(sc.parse(start), i)));
   const letters = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-  el.replaceChildren(...[...s.data].sort((a, b) => b.this_week - a.this_week || d3.ascending(a.name, b.name)).map((p) => {
+  const wkTotal = (n) => d3.sum(lg.data.filter((r) => r.name === n && r.date >= start && r.date <= days[6]), (r) => +r.steps || 0);
+  const ranked = [...s.data].map((p) => ({ ...p, wk_total: wkTotal(p.name) })).sort((a, b) => b.wk_total - a.wk_total || d3.ascending(a.name, b.name));
+  el.replaceChildren(...ranked.map((p, idx) => {
     const isGold = days.filter((d) => lg.data.some((r) => r.name === p.name && r.date === d && +r.steps >= sc.GOLD)).length >= 2;
     const card = document.createElement('div'); card.className = 'sc-card' + (isGold ? ' gold-card' : p.this_week >= 3 ? ' done-card' : ''); card.id = 'card-' + p.name.replace(/\W+/g, '-');
-    const nm = document.createElement('div'); nm.className = 'sc-card-name' + (isGold ? ' gold' : ''); nm.textContent = p.name;
+    const top = document.createElement('div'); top.className = 'sc-card-top';
+    const nm = document.createElement('div'); nm.className = 'sc-card-name' + (isGold ? ' gold' : '');
+    const rk = document.createElement('span'); rk.className = 'sc-rank'; rk.textContent = '#' + (idx + 1);
+    top.append(nm, rk);
+    const tot = document.createElement('div'); tot.className = 'sc-wk-total';
+    tot.textContent = sc.num(p.wk_total) + ' steps'; nm.textContent = p.name;
     const big = document.createElement('div'); big.className = 'sc-big';
     const v = document.createElement('span'); v.dataset.source = 'standings'; v.dataset.field = 'this_week'; v.dataset.where = 'name=' + encodeURIComponent(p.name).replace(/%20/g, ' ');
     v.textContent = p.this_week;
@@ -415,7 +425,7 @@ dash.draw('cards', (el) => {
     if (p.this_week >= 3) { pill.className = 'sc-pill ok'; pill.textContent = 'Goal met'; }
     else if (3 - p.this_week <= left) { pill.className = 'sc-pill warn'; pill.textContent = (3 - p.this_week) + ' to go'; }
     else { pill.className = 'sc-pill bad'; pill.textContent = 'Missed'; }
-    card.append(nm, big, dots, pill);
+    card.append(top, big, tot, dots, pill);
     return card;
   }));
 });
