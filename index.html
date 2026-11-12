@@ -159,6 +159,39 @@ window.dash = (function () {
 .sc-card.done-card { border-color: var(--color-ok); box-shadow: inset 0 0 0 1px var(--color-ok); }
 .sc-dot.gold { background: var(--sc-gold); border-color: var(--sc-gold); color: #1b1f24; font-weight: 600; }
 .sc-key-gold { display: inline-flex; align-items: center; gap: 6px; }
+
+/* phones only */
+@media (max-width: 640px) {
+  .sc { padding: 8px; gap: 10px; --cds-font-size-title: 22px; }
+  .sc-head, .sc-section, .sc-filters { padding: 12px; }
+  .sc-section { gap: 10px; }
+  .sc-titlebar { flex-wrap: nowrap; align-items: flex-start; }
+  .sc-titlebar h1 { font-size: 21px; line-height: 1.2; }
+  #theme-toggle { padding: 4px 8px; font-size: 12px; white-space: nowrap; flex: none; }
+  .sc-lede { font-size: 13px; }
+  .sc-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; min-height: 0; }
+  .sc-card { padding: 10px; gap: 6px; }
+  .sc-card-name { font-size: 13px; }
+  .sc-big { font-size: 22px; }
+  .sc-big small { font-size: 12px; }
+  .sc-dots { gap: 2px; }
+  .sc-dot { height: 18px; font-size: 9px; border-radius: 3px; }
+  .sc-pill { font-size: 11px; padding: 1px 6px; }
+  .sc th, .sc td { padding: 5px 6px; font-size: 12px; }
+  .sc th { white-space: normal; line-height: 1.2; }
+  #all-time th:nth-child(4), #all-time td:nth-child(4),
+  #all-time th:nth-child(5), #all-time td:nth-child(5),
+  #all-time th:nth-child(7), #all-time td:nth-child(7) { display: none; }
+  #selected-dates th:nth-child(2), #selected-dates td:nth-child(2),
+  #selected-dates th:nth-child(6), #selected-dates td:nth-child(6) { display: none; }
+  .sc-filters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .sc-filters .sc-field input, .sc-filters .sc-field select { width: 100%; box-sizing: border-box; min-width: 0; }
+  .sc-filters .sc-note { align-self: center; }
+  .sc-row { gap: 6px; }
+  .sc-seg .sc-btn { padding: 3px 10px; }
+  .sc-legend { gap: 4px 10px; font-size: 11px; }
+  .sc-chart { min-height: 300px; }
+}
 </style>
 
 <div class="sc" id="sc-page">
