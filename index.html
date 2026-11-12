@@ -156,6 +156,7 @@ window.dash = (function () {
 .sc { --sc-gold: #ffc83d; } .sc.light { --sc-gold: #b07d00; }
 .sc .gold { color: var(--sc-gold); font-weight: 600; }
 .sc-card.gold-card { border-color: var(--sc-gold); box-shadow: inset 0 0 0 1px var(--sc-gold); }
+.sc-card.done-card { border-color: var(--color-ok); box-shadow: inset 0 0 0 1px var(--color-ok); }
 .sc-dot.gold { background: var(--sc-gold); border-color: var(--sc-gold); color: #1b1f24; font-weight: 600; }
 .sc-key-gold { display: inline-flex; align-items: center; gap: 6px; }
 </style>
@@ -360,7 +361,7 @@ dash.draw('cards', (el) => {
   const letters = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
   el.replaceChildren(...[...s.data].sort((a, b) => b.this_week - a.this_week || d3.ascending(a.name, b.name)).map((p) => {
     const isGold = days.filter((d) => lg.data.some((r) => r.name === p.name && r.date === d && +r.steps >= sc.GOLD)).length >= 2;
-    const card = document.createElement('div'); card.className = 'sc-card' + (isGold ? ' gold-card' : ''); card.id = 'card-' + p.name.replace(/\W+/g, '-');
+    const card = document.createElement('div'); card.className = 'sc-card' + (isGold ? ' gold-card' : p.this_week >= 3 ? ' done-card' : ''); card.id = 'card-' + p.name.replace(/\W+/g, '-');
     const nm = document.createElement('div'); nm.className = 'sc-card-name' + (isGold ? ' gold' : ''); nm.textContent = p.name;
     const big = document.createElement('div'); big.className = 'sc-big';
     const v = document.createElement('span'); v.dataset.source = 'standings'; v.dataset.field = 'this_week'; v.dataset.where = 'name=' + encodeURIComponent(p.name).replace(/%20/g, ' ');
