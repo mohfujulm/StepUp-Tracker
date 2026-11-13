@@ -160,7 +160,11 @@ window.dash = (function () {
 .sc-card-top { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
 .sc-rank { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); font-variant-numeric: tabular-nums; }
 .sc-wk-total { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); font-variant-numeric: tabular-nums; }
-.sc-dot .v { display: none; }
+.sc-actions { display: flex; gap: 8px; flex: none; }
+.sc-dot { height: 34px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; line-height: 1; min-width: 0; }
+.sc-dot .l { font-size: 9px; opacity: .75; }
+.sc-dot .v { font-size: 10px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -.3px; white-space: nowrap; }
+.sc-dot.miss .v { color: var(--color-fg-muted); }
 .sc-dot.gold { background: var(--sc-gold); border-color: var(--sc-gold); color: #1b1f24; font-weight: 600; }
 .sc-key-gold { display: inline-flex; align-items: center; gap: 6px; }
 
@@ -171,7 +175,8 @@ window.dash = (function () {
   .sc-section { gap: 10px; }
   .sc-titlebar { flex-wrap: nowrap; align-items: flex-start; }
   .sc-titlebar h1 { font-size: 21px; line-height: 1.2; }
-  #theme-toggle { padding: 4px 8px; font-size: 12px; white-space: nowrap; flex: none; }
+  #theme-toggle, #reset { padding: 4px 8px; font-size: 12px; white-space: nowrap; flex: none; }
+  .sc-actions { gap: 6px; }
   .sc-lede { font-size: 13px; }
   .sc-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; min-height: 0; }
   .sc-card { padding: 10px; gap: 6px; }
@@ -194,11 +199,8 @@ window.dash = (function () {
   .sc-card .sc-wk-total .u { color: var(--color-fg-muted); }
   .sc th, .sc td { padding: 5px 6px; font-size: 12px; }
   .sc th { white-space: normal; line-height: 1.2; }
-  #all-time th:nth-child(4), #all-time td:nth-child(4),
-  #all-time th:nth-child(5), #all-time td:nth-child(5),
-  #all-time th:nth-child(7), #all-time td:nth-child(7) { display: none; }
-  #selected-dates th:nth-child(2), #selected-dates td:nth-child(2),
-  #selected-dates th:nth-child(6), #selected-dates td:nth-child(6) { display: none; }
+  #standings th:nth-child(4), #standings td:nth-child(4),
+  #standings th:nth-child(6), #standings td:nth-child(6) { display: none; }
   .sc-filters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .sc-filters .sc-field input, .sc-filters .sc-field select { width: 100%; box-sizing: border-box; min-width: 0; }
   .sc-filters .sc-note { align-self: center; }
@@ -213,7 +215,8 @@ window.dash = (function () {
 #sc-page.m .sc-section { gap: 10px; }
 #sc-page.m .sc-titlebar { flex-wrap: nowrap; align-items: flex-start; }
 #sc-page.m .sc-titlebar h1 { font-size: 21px; line-height: 1.2; }
-#sc-page.m #theme-toggle { padding: 4px 8px; font-size: 12px; white-space: nowrap; flex: none; }
+#sc-page.m #theme-toggle, #sc-page.m #reset { padding: 4px 8px; font-size: 12px; white-space: nowrap; flex: none; }
+#sc-page.m .sc-actions { gap: 6px; }
 #sc-page.m .sc-lede { font-size: 13px; }
 #sc-page.m .sc-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; min-height: 0; }
 #sc-page.m .sc-card { padding: 10px; gap: 6px; }
@@ -236,8 +239,7 @@ window.dash = (function () {
 #sc-page.m .sc-card .sc-wk-total .u { color: var(--color-fg-muted); }
 #sc-page.m th, #sc-page.m td { padding: 5px 6px; font-size: 12px; }
 #sc-page.m th { white-space: normal; line-height: 1.2; }
-#sc-page.m #all-time th:nth-child(4), #sc-page.m #all-time td:nth-child(4), #sc-page.m #all-time th:nth-child(5), #sc-page.m #all-time td:nth-child(5), #sc-page.m #all-time th:nth-child(7), #sc-page.m #all-time td:nth-child(7) { display: none; }
-#sc-page.m #selected-dates th:nth-child(2), #sc-page.m #selected-dates td:nth-child(2), #sc-page.m #selected-dates th:nth-child(6), #sc-page.m #selected-dates td:nth-child(6) { display: none; }
+#sc-page.m #standings th:nth-child(4), #sc-page.m #standings td:nth-child(4), #sc-page.m #standings th:nth-child(6), #sc-page.m #standings td:nth-child(6) { display: none; }
 #sc-page.m .sc-filters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 #sc-page.m .sc-filters .sc-field input, #sc-page.m .sc-filters .sc-field select { width: 100%; box-sizing: border-box; min-width: 0; }
 #sc-page.m .sc-filters .sc-note { align-self: center; }
@@ -252,7 +254,10 @@ window.dash = (function () {
   <header class="sc-head" id="title">
     <div class="sc-titlebar">
       <h1>Staying Fit &amp; Better Food Choices</h1>
-      <button type="button" class="sc-btn" id="theme-toggle" aria-label="Switch color mode"><span class="when-dark">Light mode</span><span class="when-light">Dark mode</span></button>
+      <div class="sc-actions">
+        <button type="button" class="sc-btn" id="reset" title="Clear filters and go back to the default view">Reset</button>
+        <button type="button" class="sc-btn" id="theme-toggle" aria-label="Switch color mode"><span class="when-dark">Light mode</span><span class="when-light">Dark mode</span></button>
+      </div>
     </div>
     <p class="sc-lede">5,000 steps, 3 days a week (Mon–Sun). <span data-draw="lede">—</span></p>
   </header>
@@ -262,38 +267,21 @@ window.dash = (function () {
     <div class="sc-cards" data-draw="cards" data-source="standings"></div>
   </section>
 
-  <section class="sc-section" id="all-time">
-    <h2>All time</h2>
-    <div class="sc-scroll">
-      <table data-source="standings" data-row-key="name">
-        <thead><tr>
-          <th data-field="name">Name</th>
-          <th data-field="days_met">Days at 5,000+</th>
-          <th data-field="hit_rate">Hit rate</th>
-          <th data-field="weeks_hit">Weeks met</th>
-          <th data-field="week_streak">Week streak</th>
-          <th data-field="avg_steps">Avg per day</th>
-          <th data-field="total_steps">Total steps</th>
-          <th data-field="best_steps">Best day</th>
-        </tr></thead>
-        <tbody data-draw="stats"></tbody>
-      </table>
-    </div>
-  </section>
-
   <section class="sc-filters" id="filters" aria-label="Filters">
     <label class="sc-field">Week<select class="dash-select" id="week" data-draw="week" data-source="weekly"></select></label>
     <label class="sc-field">From<input type="date" id="from" data-draw="from"></label>
     <label class="sc-field">To<input type="date" id="to" data-draw="to"></label>
     <label class="sc-field">Person<select class="dash-select" id="who" data-draw="who" data-source="standings"></select></label>
-    <button type="button" class="sc-btn" id="reset">Reset</button>
-    <span class="sc-note" data-draw="rangelabel">—</span>
   </section>
 
-  <section class="sc-section" id="weekly-history">
-    <h2>By week</h2>
-    <p class="sc-note">Days at 5,000+. Green: goal met. Dashed: in progress.</p>
-    <div class="sc-scroll"><table class="sc-grid" data-draw="weekgrid" data-source="weekly"></table></div>
+  <section class="sc-section" id="standings">
+    <div class="sc-row"><h2>Standings</h2><span class="sc-note" data-draw="rangelabel">All time</span></div>
+    <div class="sc-scroll">
+      <table data-source="log">
+        <thead><tr><th>Name</th><th>Days at 5,000+</th><th>Hit rate</th><th>Weeks met</th><th>Avg per day</th><th>Total steps</th><th>Best day</th></tr></thead>
+        <tbody data-draw="table"></tbody>
+      </table>
+    </div>
   </section>
 
   <section class="sc-section" id="daily-steps">
@@ -306,16 +294,6 @@ window.dash = (function () {
       </div>
     </div>
     <div class="sc-chart" data-draw="daily" data-source="log"></div>
-  </section>
-
-  <section class="sc-section" id="selected-dates">
-    <h2>Selected range</h2>
-    <div class="sc-scroll">
-      <table data-source="log">
-        <thead><tr><th>Name</th><th>Days logged</th><th>Days at 5,000+</th><th>Hit rate</th><th>Avg per day</th><th>Total steps</th><th>Best day</th></tr></thead>
-        <tbody data-draw="rangestats"></tbody>
-      </table>
-    </div>
   </section>
 
   <section class="sc-section" id="daily-log">
@@ -338,12 +316,36 @@ window.sc = window.sc || { who: '', from: '', to: '' };
   const set = () => document.querySelectorAll('#sc-page').forEach((p) => p.classList.toggle('m', phone()));
   set(); window.addEventListener('resize', set);
 })();
+// remember the view (filters, chart period, theme) in a cookie, with localStorage as a fallback
+sc.KEY = 'sc_view';
+sc.save = () => {
+  const page = document.getElementById('sc-page');
+  const v = JSON.stringify({ who: sc.who || '', from: sc.from || '', to: sc.to || '', span: sc.span || 'week', light: !!(page && page.classList.contains('light')) });
+  try { document.cookie = sc.KEY + '=' + encodeURIComponent(v) + '; max-age=31536000; path=/; SameSite=Lax'; } catch (e) {}
+  try { localStorage.setItem(sc.KEY, v); } catch (e) {}
+};
+sc.clearSaved = () => {
+  try { document.cookie = sc.KEY + '=; max-age=0; path=/'; } catch (e) {}
+  try { localStorage.removeItem(sc.KEY); } catch (e) {}
+};
+(function load() {
+  let raw = null;
+  try { const m = document.cookie.match(new RegExp('(?:^|; )' + sc.KEY + '=([^;]*)')); if (m) raw = decodeURIComponent(m[1]); } catch (e) {}
+  if (!raw) { try { raw = localStorage.getItem(sc.KEY); } catch (e) {} }
+  if (!raw) return;
+  try {
+    const v = JSON.parse(raw);
+    sc.who = v.who || ''; sc.from = v.from || ''; sc.to = v.to || ''; sc.span = v.span || 'week';
+    if (v.light) document.querySelectorAll('#sc-page').forEach((p) => p.classList.add('light'));
+  } catch (e) {}
+})();
 document.querySelectorAll('#theme-toggle').forEach((b) => b.addEventListener('click', () => {
   document.querySelectorAll('#sc-page').forEach((p) => p.classList.toggle('light'));
+  sc.save();
 }));
 sc.inRange = (iso) => (!sc.from || iso >= sc.from) && (!sc.to || iso <= sc.to);
 sc.pick = (r) => sc.inRange(r.date) && (!sc.who || r.name === sc.who);
-sc.redraw = () => ['daily', 'weekgrid', 'rangestats', 'logrows', 'rangelabel', 'from', 'to', 'who', 'week'].forEach((n) => dash.draw(n));
+sc.redraw = () => { ['daily', 'table', 'logrows', 'rangelabel', 'from', 'to', 'who', 'week'].forEach((n) => dash.draw(n)); sc.save(); };
 sc.parse = d3.utcParse('%Y-%m-%d');
 sc.fmtDay = d3.utcFormat('%a %b %-d');
 sc.fmtShort = d3.utcFormat('%b %-d');
@@ -489,49 +491,6 @@ dash.draw('cards', (el) => {
   }));
 });
 
-dash.draw('weekgrid', (el) => {
-  const w = dash.data('weekly');
-  if (w.status !== 'ok' || !w.data) { el.replaceChildren(); return; }
-  const allWeeks = [...new Set(w.data.map((r) => r.week))].sort();
-  const sunday = (wk) => d3.utcFormat('%Y-%m-%d')(d3.utcDay.offset(sc.parse(wk), 6));
-  const weeks = allWeeks.filter((wk) => (!sc.to || wk <= sc.to) && (!sc.from || sunday(wk) >= sc.from));
-  const names = [...new Set(w.data.map((r) => r.name))].sort().filter((n) => !sc.who || n === sc.who);
-  if (!weeks.length) { el.replaceChildren(); return; }
-  const goldW = sc.goldNames();
-  const thead = document.createElement('thead'), hr = document.createElement('tr');
-  const h0 = document.createElement('th'); h0.textContent = 'Name'; hr.append(h0);
-  weeks.forEach((wk) => {
-    const th = document.createElement('th'); th.className = 'wk sc-click'; th.textContent = sc.fmtShort(sc.parse(wk));
-    th.tabIndex = 0; th.title = 'Show this week';
-    const pickWeek = () => { sc.from = wk; sc.to = sunday(wk); sc.redraw(); };
-    th.onclick = pickWeek; th.onkeydown = (e) => { if (e.key === 'Enter') pickWeek(); };
-    hr.append(th);
-  });
-  const ht = document.createElement('th'); ht.textContent = 'Weeks met'; hr.append(ht);
-  thead.append(hr);
-  const tbody = document.createElement('tbody');
-  names.forEach((n) => {
-    const tr = document.createElement('tr');
-    const td0 = document.createElement('td'); td0.textContent = n; if (goldW.has(n)) td0.className = 'gold'; tr.append(td0);
-    weeks.forEach((wk) => {
-      const r = w.data.find((x) => x.week === wk && x.name === n);
-      const td = document.createElement('td'); td.className = 'wk';
-      const c = document.createElement('span');
-      c.className = 'sc-cell ' + (r.goal_met === 'yes' ? 'hit' : 'miss') + (r.in_progress === 'yes' ? ' live' : '');
-      c.dataset.source = 'weekly'; c.dataset.field = 'days_met';
-      c.dataset.where = 'week=' + wk + '&name=' + encodeURIComponent(n).replace(/%20/g, ' ');
-      c.textContent = r.days_met;
-      c.title = n + ', week of ' + sc.fmtShort(sc.parse(wk)) + ': ' + r.days_met + ' of ' + r.days_logged + ' logged days at 5,000+';
-      td.append(c); tr.append(td);
-    });
-    const tdt = document.createElement('td');
-    tdt.dataset.source = 'standings'; tdt.dataset.field = 'weeks_hit'; tdt.dataset.where = 'name=' + encodeURIComponent(n).replace(/%20/g, ' ');
-    tdt.textContent = w.data.filter((x) => x.name === n && x.goal_met === 'yes' && x.in_progress === 'no').length;
-    tr.append(tdt); tbody.append(tr);
-  });
-  el.replaceChildren(thead, tbody);
-});
-
 dash.draw('who', (sel) => {
   const s = dash.data('standings');
   const names = s.status === 'ok' && s.data ? s.data.map((r) => r.name).sort() : [];
@@ -569,37 +528,18 @@ dash.draw('week', (sel) => {
 }));
 
 dash.draw('rangelabel', (el) => {
-  document.querySelectorAll('#reset').forEach((b) => { b.onclick = () => { sc.from = ''; sc.to = ''; sc.who = ''; sc.redraw(); }; });
+  document.querySelectorAll('#reset').forEach((b) => {
+    b.onclick = () => {
+      sc.from = ''; sc.to = ''; sc.who = ''; sc.span = 'week'; sc.hl = null; sc.hover = null;
+      document.querySelectorAll('#sc-page').forEach((p) => p.classList.remove('light'));
+      sc.clearSaved(); sc.redraw(); sc.clearSaved();
+    };
+  });
   const lg = dash.data('log');
   if (lg.status !== 'ok') { el.textContent = '—'; return; }
   const days = new Set(lg.data.filter((r) => sc.inRange(r.date)).map((r) => r.date)).size;
-  el.textContent = days + (days === 1 ? ' day' : ' days');
-});
-
-dash.draw('rangestats', (tb) => {
-  const lg = dash.data('log');
-  if (lg.status !== 'ok') { tb.replaceChildren(); return; }
-  const rows = lg.data.filter(sc.pick);
-  const goldR = sc.goldNames();
-  const names = [...new Set(rows.map((r) => r.name))];
-  const stats = names.map((n) => {
-    const mine = rows.filter((r) => r.name === n);
-    const counted = mine.filter((r) => r.steps !== null && r.steps !== '');
-    const met = mine.filter((r) => r.met === 'YES').length;
-    const best = counted.reduce((a, r) => (a && +a.steps >= +r.steps ? a : r), null);
-    return { n, logged: mine.length, met, rate: mine.length ? Math.round((100 * met) / mine.length) : 0,
-      avg: counted.length ? Math.round(d3.mean(counted, (r) => +r.steps)) : null, total: d3.sum(counted, (r) => +r.steps), best };
-  }).sort((a, b) => b.met - a.met || (b.total - a.total));
-  if (!stats.length) {
-    const tr = document.createElement('tr'); const td = document.createElement('td'); td.colSpan = 7; td.textContent = 'No data'; tr.append(td);
-    tb.replaceChildren(tr); return;
-  }
-  tb.replaceChildren(...stats.map((p) => {
-    const tr = document.createElement('tr');
-    [p.n, p.logged, p.met, p.rate + '%', p.avg === null ? '—' : sc.num(p.avg), sc.num(p.total), p.best ? sc.num(+p.best.steps) + ' (' + sc.fmtShort(sc.parse(p.best.date)) + ')' : '—']
-      .forEach((v, i) => { const td = document.createElement('td'); td.textContent = v; if (i === 0 && goldR.has(p.n)) td.className = 'gold'; if (i === 6 && p.best && +p.best.steps >= sc.GOLD) td.className = 'gold'; tr.append(td); });
-    return tr;
-  }));
+  const span = !sc.from && !sc.to ? 'All time' : (sc.from ? sc.fmtShort(sc.parse(sc.from)) : 'Start') + ' – ' + (sc.to ? sc.fmtShort(sc.parse(sc.to)) : 'latest');
+  el.textContent = span + (sc.who ? ' · ' + sc.who : '') + ' · ' + days + (days === 1 ? ' day' : ' days');
 });
 
 dash.draw('daily', (el) => {
@@ -607,7 +547,7 @@ dash.draw('daily', (el) => {
   document.querySelectorAll('[data-span]').forEach((b) => {
     b.classList.toggle('on', b.dataset.span === sc.span);
     b.setAttribute('aria-pressed', String(b.dataset.span === sc.span));
-    b.onclick = () => { sc.span = b.dataset.span; sc.hl = null; dash.draw('daily'); };
+    b.onclick = () => { sc.span = b.dataset.span; sc.hl = null; dash.draw('daily'); sc.save(); };
   });
   const lg = dash.data('log');
   if (lg.status !== 'ok') { el.textContent = lg.status === 'error' ? 'Failed to load' : '—'; return; }
@@ -718,15 +658,34 @@ dash.draw('daily', (el) => {
   paint();
 });
 
-dash.draw('stats', (tb) => {
-  const s = dash.data('standings');
-  if (s.status !== 'ok' || !s.data) { tb.replaceChildren(); return; }
-  const fmt = (v) => (v === null ? '—' : sc.num(v));
-  const goldS = sc.goldNames();
-  tb.replaceChildren(...[...s.data].sort((a, b) => b.days_met - a.days_met || d3.ascending(a.name, b.name)).map((p) => {
+dash.draw('table', (tb) => {
+  const lg = dash.data('log'), w = dash.data('weekly');
+  if (lg.status !== 'ok') { tb.replaceChildren(); return; }
+  const rows = lg.data.filter(sc.pick);
+  const gold = sc.goldNames();
+  const sun = (wk) => d3.utcFormat('%Y-%m-%d')(d3.utcDay.offset(sc.parse(wk), 6));
+  const wrows = w.status === 'ok' && w.data ? w.data.filter((x) => x.in_progress === 'no' && x.goal_met === 'yes' && (!sc.to || x.week <= sc.to) && (!sc.from || sun(x.week) >= sc.from)) : [];
+  const names = [...new Set(rows.map((r) => r.name))];
+  const stats = names.map((n) => {
+    const mine = rows.filter((r) => r.name === n);
+    const counted = mine.filter((r) => r.steps !== null && r.steps !== '');
+    const met = mine.filter((r) => r.met === 'YES').length;
+    const best = counted.reduce((a, r) => (a && +a.steps >= +r.steps ? a : r), null);
+    return { n, met, rate: mine.length ? Math.round((100 * met) / mine.length) : 0, weeks: wrows.filter((x) => x.name === n).length,
+      avg: counted.length ? Math.round(d3.mean(counted, (r) => +r.steps)) : null, total: d3.sum(counted, (r) => +r.steps), best };
+  }).sort((a, b) => b.met - a.met || b.total - a.total || d3.ascending(a.n, b.n));
+  if (!stats.length) {
+    const tr = document.createElement('tr'); const td = document.createElement('td'); td.colSpan = 7; td.textContent = 'No data'; tr.append(td);
+    tb.replaceChildren(tr); return;
+  }
+  tb.replaceChildren(...stats.map((p) => {
     const tr = document.createElement('tr');
-    const cells = [p.name, p.days_met, p.hit_rate + '%', p.weeks_hit, p.week_streak, fmt(p.avg_steps), fmt(p.total_steps), fmt(p.best_steps)];
-    cells.forEach((c, i) => { const td = document.createElement('td'); td.textContent = c; if (i === 0 && goldS.has(p.name)) td.className = 'gold'; if (i === 7 && p.best_steps >= sc.GOLD) td.className = 'gold'; tr.append(td); });
+    const bestTxt = p.best ? sc.num(+p.best.steps) + ' (' + sc.fmtShort(sc.parse(p.best.date)) + ')' : '—';
+    [p.n, p.met, p.rate + '%', p.weeks, p.avg === null ? '—' : sc.num(p.avg), sc.num(p.total), bestTxt].forEach((v, i) => {
+      const td = document.createElement('td'); td.textContent = v;
+      if ((i === 0 && gold.has(p.n)) || (i === 6 && p.best && +p.best.steps >= sc.GOLD)) td.className = 'gold';
+      tr.append(td);
+    });
     return tr;
   }));
 });
