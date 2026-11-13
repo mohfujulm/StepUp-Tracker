@@ -474,7 +474,7 @@ dash.draw('cards', (el) => {
       dot.className = 'sc-dot' + (row ? (+row.steps >= sc.GOLD ? ' gold' : row.met === 'YES' ? ' met' : ' miss') : '');
       const lt = document.createElement('span'); lt.className = 'l'; lt.textContent = letters[i];
       const vv = document.createElement('span'); vv.className = 'v';
-      if (row && row.steps !== null && row.steps !== '') { const k = +row.steps / 1000; vv.textContent = (k >= 10 ? Math.round(k) : k.toFixed(1)) + 'k'; }
+      if (row && row.steps !== null && row.steps !== '') { const k = +row.steps / 1000; vv.textContent = +row.steps < 1000 ? String(+row.steps) : (k >= 10 ? Math.round(k) : k.toFixed(1)) + 'k'; }
       dot.append(lt, vv);
       dot.title = sc.fmtDay(sc.parse(d)) + (row ? ': ' + (row.steps ? sc.num(+row.steps) + ' steps' : 'unknown') : (d > latest ? ': not yet' : ': not logged'));
       dots.append(dot);
