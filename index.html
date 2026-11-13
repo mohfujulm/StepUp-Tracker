@@ -180,6 +180,13 @@ window.dash = (function () {
   .sc-dots { gap: 2px; }
   .sc-dot { height: 18px; font-size: 9px; border-radius: 3px; }
   .sc-pill { font-size: 11px; padding: 1px 6px; }
+  .sc-card { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; row-gap: 6px; align-items: baseline; }
+  .sc-card-top, .sc-card .sc-dots, .sc-card .sc-pill { grid-column: 1 / -1; }
+  .sc-card .sc-pill { justify-self: start; }
+  .sc-card-top .sc-card-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sc-card .sc-big { font-size: 20px; }
+  .sc-card .sc-wk-total { justify-self: end; font-size: 12px; color: var(--color-fg); }
+  .sc-card .sc-wk-total .u { color: var(--color-fg-muted); }
   .sc th, .sc td { padding: 5px 6px; font-size: 12px; }
   .sc th { white-space: normal; line-height: 1.2; }
   #all-time th:nth-child(4), #all-time td:nth-child(4),
@@ -405,7 +412,7 @@ dash.draw('cards', (el) => {
     const rk = document.createElement('span'); rk.className = 'sc-rank'; rk.textContent = '#' + (idx + 1);
     top.append(nm, rk);
     const tot = document.createElement('div'); tot.className = 'sc-wk-total';
-    tot.textContent = sc.num(p.wk_total) + ' steps'; nm.textContent = p.name;
+    tot.textContent = sc.num(p.wk_total); const u = document.createElement('span'); u.className = 'u'; u.textContent = ' steps'; tot.append(u); nm.textContent = p.name;
     const big = document.createElement('div'); big.className = 'sc-big';
     const v = document.createElement('span'); v.dataset.source = 'standings'; v.dataset.field = 'this_week'; v.dataset.where = 'name=' + encodeURIComponent(p.name).replace(/%20/g, ' ');
     v.textContent = p.this_week;
