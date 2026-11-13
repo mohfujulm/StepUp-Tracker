@@ -161,6 +161,24 @@ window.dash = (function () {
 .sc-rank { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); font-variant-numeric: tabular-nums; }
 .sc-wk-total { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); font-variant-numeric: tabular-nums; }
 .sc-actions { display: flex; gap: 8px; flex: none; }
+.sc-ms { position: relative; min-width: 180px; }
+.sc-ms-btn { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; font: inherit; font-size: var(--cds-font-size-body); color: var(--color-fg); background: var(--color-bg); border: 1px solid var(--sc-line); border-radius: var(--cds-radius); padding: 6px 10px; cursor: pointer; text-align: left; }
+.sc-ms-btn .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sc-ms-btn .chev { flex: none; opacity: .7; transition: transform .15s; }
+.sc-ms.open .sc-ms-btn .chev { transform: rotate(180deg); }
+.sc-ms-btn:focus-visible, .sc-ms-opt:focus-visible, .sc-ms-act:focus-visible { outline: 2px solid var(--color-fg-muted); outline-offset: 1px; }
+.sc-ms-panel { display: none; position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; min-width: 100%; width: max-content; max-width: min(320px, 90vw); background: var(--cds-surface-popover); border: 1px solid var(--cds-border); border-radius: var(--cds-radius); box-shadow: var(--cds-shadow-popover); padding: 6px; }
+.sc-ms.open .sc-ms-panel { display: block; }
+.sc-ms-acts { display: flex; justify-content: space-between; gap: 8px; padding: 2px 4px 6px; border-bottom: 1px solid var(--sc-line); margin-bottom: 4px; }
+.sc-ms-act { font: inherit; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); background: none; border: 0; padding: 4px 2px; cursor: pointer; }
+.sc-ms-act:hover { color: var(--color-fg); }
+.sc-ms-list { display: flex; flex-direction: column; touch-action: none; user-select: none; -webkit-user-select: none; }
+.sc-ms-opt { display: flex; align-items: center; gap: 10px; font: inherit; font-size: var(--cds-font-size-body); color: var(--color-fg); background: none; border: 0; border-radius: 6px; padding: 7px 8px; cursor: pointer; text-align: left; }
+.sc-ms-opt:hover { background: color-mix(in srgb, var(--color-fg) 8%, transparent); }
+.sc-ms-box { flex: none; width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--color-fg-muted); display: grid; place-items: center; }
+.sc-ms-opt[aria-selected="true"] .sc-ms-box { background: var(--color-ok); border-color: var(--color-ok); }
+.sc-ms-opt[aria-selected="true"] .sc-ms-box::after { content: ''; width: 8px; height: 4px; border: 2px solid var(--color-bg); border-top: 0; border-right: 0; transform: translateY(-1px) rotate(-45deg); }
+.sc-ms-hint { font-size: 11px; color: var(--color-fg-muted); padding: 6px 8px 2px; }
 .sc-dot { height: 34px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; line-height: 1; min-width: 0; }
 .sc-dot .l { font-size: 9px; opacity: .75; }
 .sc-dot .v { font-size: 10px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -.3px; white-space: nowrap; }
@@ -203,6 +221,9 @@ window.dash = (function () {
   #standings th:nth-child(6), #standings td:nth-child(6) { display: none; }
   .sc-filters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .sc-filters .sc-field input, .sc-filters .sc-field select { width: 100%; box-sizing: border-box; min-width: 0; }
+  .sc-ms { min-width: 0; }
+  .sc-ms-opt { padding: 9px 8px; }
+  .sc-ms-panel { left: auto; right: 0; max-width: calc(100vw - 40px); }
   .sc-filters .sc-note { align-self: center; }
   .sc-row { gap: 6px; }
   .sc-seg .sc-btn { padding: 3px 10px; }
@@ -242,6 +263,9 @@ window.dash = (function () {
 #sc-page.m #standings th:nth-child(4), #sc-page.m #standings td:nth-child(4), #sc-page.m #standings th:nth-child(6), #sc-page.m #standings td:nth-child(6) { display: none; }
 #sc-page.m .sc-filters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 #sc-page.m .sc-filters .sc-field input, #sc-page.m .sc-filters .sc-field select { width: 100%; box-sizing: border-box; min-width: 0; }
+#sc-page.m .sc-ms { min-width: 0; }
+#sc-page.m .sc-ms-opt { padding: 9px 8px; }
+#sc-page.m .sc-ms-panel { left: auto; right: 0; max-width: calc(100vw - 40px); }
 #sc-page.m .sc-filters .sc-note { align-self: center; }
 #sc-page.m .sc-row { gap: 6px; }
 #sc-page.m .sc-seg .sc-btn { padding: 3px 10px; }
@@ -271,7 +295,7 @@ window.dash = (function () {
     <label class="sc-field">Week<select class="dash-select" id="week" data-draw="week" data-source="weekly"></select></label>
     <label class="sc-field">From<input type="date" id="from" data-draw="from"></label>
     <label class="sc-field">To<input type="date" id="to" data-draw="to"></label>
-    <label class="sc-field">Person<select class="dash-select" id="who" data-draw="who" data-source="standings"></select></label>
+    <div class="sc-field sc-field-ms"><span id="who-label">People</span><div class="sc-ms" id="who" data-draw="who" data-source="standings"></div></div>
   </section>
 
   <section class="sc-section" id="standings">
@@ -310,7 +334,7 @@ window.dash = (function () {
 </div>
 
 <script>
-window.sc = window.sc || { who: '', from: '', to: '' };
+window.sc = window.sc || { people: [], from: '', to: '' };
 (function () {
   const phone = () => Math.min(screen.width || 9999, window.innerWidth || 9999) <= 640;
   const set = () => document.querySelectorAll('#sc-page').forEach((p) => p.classList.toggle('m', phone()));
@@ -320,7 +344,7 @@ window.sc = window.sc || { who: '', from: '', to: '' };
 sc.KEY = 'sc_view';
 sc.save = () => {
   const page = document.getElementById('sc-page');
-  const v = JSON.stringify({ who: sc.who || '', from: sc.from || '', to: sc.to || '', span: sc.span || 'week', light: !!(page && page.classList.contains('light')) });
+  const v = JSON.stringify({ people: sc.people || [], from: sc.from || '', to: sc.to || '', span: sc.span || 'week', light: !!(page && page.classList.contains('light')) });
   try { document.cookie = sc.KEY + '=' + encodeURIComponent(v) + '; max-age=31536000; path=/; SameSite=Lax'; } catch (e) {}
   try { localStorage.setItem(sc.KEY, v); } catch (e) {}
 };
@@ -335,7 +359,7 @@ sc.clearSaved = () => {
   if (!raw) return;
   try {
     const v = JSON.parse(raw);
-    sc.who = v.who || ''; sc.from = v.from || ''; sc.to = v.to || ''; sc.span = v.span || 'week';
+    sc.people = Array.isArray(v.people) ? v.people : (v.who ? [v.who] : []); sc.from = v.from || ''; sc.to = v.to || ''; sc.span = v.span || 'week';
     if (v.light) document.querySelectorAll('#sc-page').forEach((p) => p.classList.add('light'));
   } catch (e) {}
 })();
@@ -344,8 +368,11 @@ document.querySelectorAll('#theme-toggle').forEach((b) => b.addEventListener('cl
   sc.save();
 }));
 sc.inRange = (iso) => (!sc.from || iso >= sc.from) && (!sc.to || iso <= sc.to);
-sc.pick = (r) => sc.inRange(r.date) && (!sc.who || r.name === sc.who);
-sc.redraw = () => { ['daily', 'table', 'logrows', 'rangelabel', 'from', 'to', 'who', 'week'].forEach((n) => dash.draw(n)); sc.save(); };
+sc.people = sc.people || [];
+sc.picked = (n) => !sc.people.length || sc.people.includes(n);
+sc.pickLabel = () => (!sc.people.length ? '' : sc.people.length <= 2 ? sc.people.join(', ') : sc.people.length + ' people');
+sc.pick = (r) => sc.inRange(r.date) && sc.picked(r.name);
+sc.redraw = (skip) => { ['daily', 'table', 'logrows', 'rangelabel', 'from', 'to', 'who', 'week'].filter((n) => n !== skip).forEach((n) => dash.draw(n)); sc.save(); };
 sc.parse = d3.utcParse('%Y-%m-%d');
 sc.fmtDay = d3.utcFormat('%a %b %-d');
 sc.fmtShort = d3.utcFormat('%b %-d');
@@ -491,12 +518,102 @@ dash.draw('cards', (el) => {
   }));
 });
 
-dash.draw('who', (sel) => {
+dash.draw('who', (el) => {
   const s = dash.data('standings');
-  const names = s.status === 'ok' && s.data ? s.data.map((r) => r.name).sort() : [];
-  sel.replaceChildren(new Option('Everyone', ''), ...names.map((n) => new Option(n, n)));
-  sel.value = names.includes(sc.who) ? sc.who : '';
-  sel.onchange = () => { sc.who = sel.value; sc.redraw(); };
+  const names = s.status === 'ok' && s.data ? s.data.map((r) => r.name).sort(d3.ascending) : [];
+  if (names.length) sc.people = sc.people.filter((n) => names.includes(n));
+  const wasOpen = el.classList.contains('open');
+  el.replaceChildren();
+  const btn = document.createElement('button');
+  btn.type = 'button'; btn.className = 'sc-ms-btn';
+  btn.setAttribute('aria-haspopup', 'listbox'); btn.setAttribute('aria-labelledby', 'who-label');
+  const t = document.createElement('span'); t.className = 't';
+  const chev = document.createElement('span'); chev.className = 'chev'; chev.textContent = '▾';
+  btn.append(t, chev);
+  const panel = document.createElement('div'); panel.className = 'sc-ms-panel';
+  const acts = document.createElement('div'); acts.className = 'sc-ms-acts';
+  const all = document.createElement('button'); all.type = 'button'; all.className = 'sc-ms-act'; all.textContent = 'Everyone';
+  const done = document.createElement('button'); done.type = 'button'; done.className = 'sc-ms-act'; done.textContent = 'Done';
+  acts.append(all, done);
+  const list = document.createElement('div'); list.className = 'sc-ms-list';
+  list.setAttribute('role', 'listbox'); list.setAttribute('aria-multiselectable', 'true'); list.setAttribute('aria-labelledby', 'who-label');
+  const opts = names.map((n) => {
+    const o = document.createElement('button'); o.type = 'button'; o.className = 'sc-ms-opt'; o.dataset.name = n;
+    o.setAttribute('role', 'option');
+    const box = document.createElement('span'); box.className = 'sc-ms-box';
+    const lab = document.createElement('span'); lab.textContent = n;
+    o.append(box, lab); list.append(o); return o;
+  });
+  const hint = document.createElement('div'); hint.className = 'sc-ms-hint'; hint.textContent = 'Tip: press and drag to select several.';
+  panel.append(acts, list, hint);
+  el.append(btn, panel);
+
+  const sync = () => {
+    opts.forEach((o) => o.setAttribute('aria-selected', String(sc.people.includes(o.dataset.name))));
+    t.textContent = sc.people.length ? (sc.people.length <= 2 ? sc.people.join(', ') : sc.people.length + ' people') : 'Everyone';
+    btn.title = sc.people.length ? sc.people.join(', ') : 'Everyone';
+  };
+  const apply = () => { sync(); sc.redraw('who'); };
+  const setName = (n, on) => {
+    const has = sc.people.includes(n);
+    if (on && !has) sc.people = [...sc.people, n].sort(d3.ascending);
+    else if (!on && has) sc.people = sc.people.filter((x) => x !== n);
+    else return false;
+    return true;
+  };
+  const open = (v) => {
+    el.classList.toggle('open', v); btn.setAttribute('aria-expanded', String(v));
+    if (v) {
+      const first = opts.find((o) => o.getAttribute('aria-selected') === 'true') || opts[0]; if (first) first.focus({ preventScroll: true });
+      try { panel.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (err) { panel.scrollIntoView(false); }
+    }
+  };
+  btn.onclick = () => open(!el.classList.contains('open'));
+  all.onclick = () => { sc.people = []; apply(); };
+  done.onclick = () => { open(false); btn.focus(); };
+
+  // press-and-drag selection: the first row decides whether the drag selects or clears
+  let drag = null;
+  list.addEventListener('pointerdown', (e) => {
+    const o = e.target.closest('.sc-ms-opt'); if (!o) return;
+    e.preventDefault();
+    try { list.setPointerCapture(e.pointerId); } catch (err) {}
+    const mode = !sc.people.includes(o.dataset.name);
+    drag = { mode, seen: new Set([o.dataset.name]), id: e.pointerId };
+    if (setName(o.dataset.name, mode)) sync();
+  });
+  list.addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const hit = document.elementFromPoint(e.clientX, e.clientY);
+    const o = hit && hit.closest ? hit.closest('.sc-ms-opt') : null;
+    if (!o || !list.contains(o) || drag.seen.has(o.dataset.name)) return;
+    drag.seen.add(o.dataset.name);
+    if (setName(o.dataset.name, drag.mode)) sync();
+  });
+  const end = (e) => { if (!drag || (e && e.pointerId !== drag.id)) return; drag = null; apply(); };
+  list.addEventListener('pointerup', end);
+  list.addEventListener('pointercancel', end);
+  // keyboard: Space/Enter toggles, arrows move, Escape closes
+  list.addEventListener('click', (e) => {
+    const o = e.target.closest('.sc-ms-opt'); if (!o || e.detail !== 0) return;
+    setName(o.dataset.name, !sc.people.includes(o.dataset.name)); apply();
+  });
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && el.classList.contains('open')) { open(false); btn.focus(); e.preventDefault(); return; }
+    const i = opts.indexOf(document.activeElement);
+    if (i < 0) { if (e.key === 'ArrowDown' && document.activeElement === btn) { open(true); e.preventDefault(); } return; }
+    if (e.key === 'ArrowDown' && opts[i + 1]) { opts[i + 1].focus(); e.preventDefault(); }
+    if (e.key === 'ArrowUp') { (opts[i - 1] || btn).focus(); e.preventDefault(); }
+  });
+  if (!sc._msOutside) {
+    sc._msOutside = true;
+    document.addEventListener('pointerdown', (e) => {
+      document.querySelectorAll('.sc-ms.open').forEach((m) => { if (!m.contains(e.target)) { m.classList.remove('open'); const b2 = m.querySelector('.sc-ms-btn'); if (b2) b2.setAttribute('aria-expanded', 'false'); } });
+    });
+  }
+  sync();
+  btn.setAttribute('aria-expanded', String(wasOpen));
+  if (wasOpen) el.classList.add('open');
 });
 
 dash.draw('week', (sel) => {
@@ -530,7 +647,7 @@ dash.draw('week', (sel) => {
 dash.draw('rangelabel', (el) => {
   document.querySelectorAll('#reset').forEach((b) => {
     b.onclick = () => {
-      sc.from = ''; sc.to = ''; sc.who = ''; sc.span = 'week'; sc.hl = null; sc.hover = null;
+      sc.from = ''; sc.to = ''; sc.people = []; sc.span = 'week'; sc.hl = null; sc.hover = null;
       document.querySelectorAll('#sc-page').forEach((p) => p.classList.remove('light'));
       sc.clearSaved(); sc.redraw(); sc.clearSaved();
     };
@@ -539,7 +656,7 @@ dash.draw('rangelabel', (el) => {
   if (lg.status !== 'ok') { el.textContent = '—'; return; }
   const days = new Set(lg.data.filter((r) => sc.inRange(r.date)).map((r) => r.date)).size;
   const span = !sc.from && !sc.to ? 'All time' : (sc.from ? sc.fmtShort(sc.parse(sc.from)) : 'Start') + ' – ' + (sc.to ? sc.fmtShort(sc.parse(sc.to)) : 'latest');
-  el.textContent = span + (sc.who ? ' · ' + sc.who : '') + ' · ' + days + (days === 1 ? ' day' : ' days');
+  el.textContent = span + (sc.people.length ? ' · ' + sc.pickLabel() : '') + ' · ' + days + (days === 1 ? ' day' : ' days');
 });
 
 dash.draw('daily', (el) => {
@@ -556,7 +673,7 @@ dash.draw('daily', (el) => {
   const logged = lg.data.filter((r) => r.steps !== null && r.steps !== '');
   if (!logged.length) { el.textContent = 'No data'; return; }
   const names = [...new Set(lg.data.map((r) => r.name))].sort();
-  const shown = sc.who ? [sc.who] : names;
+  const shown = names.filter(sc.picked);
   const color = (n) => dash.colors[names.indexOf(n) % dash.colors.length];
   const allDates = lg.data.map((r) => r.date).sort();
   const todayIso = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date());
@@ -590,7 +707,7 @@ dash.draw('daily', (el) => {
   const step = Math.max(1, Math.ceil(days.length / Math.max(2, Math.floor((W - m.l - m.r) / 58))));
   const tf = sc.span === 'week' ? d3.utcFormat('%a %-d') : d3.utcFormat('%b %-d');
   const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img')
-    .attr('aria-label', 'Daily steps' + (sc.who ? ' for ' + sc.who : ' per person') + ' from ' + sc.fmtShort(start) + ' to ' + sc.fmtShort(end) + ', with a line at 5,000 steps');
+    .attr('aria-label', 'Daily steps' + (sc.people.length ? ' for ' + sc.pickLabel() : ' per person') + ' from ' + sc.fmtShort(start) + ' to ' + sc.fmtShort(end) + ', with a line at 5,000 steps');
   svg.append('g').attr('transform', `translate(0,${H - m.b})`)
     .call(d3.axisBottom(x).tickValues(days.filter((_, i) => i % step === 0)).tickFormat(tf).tickSizeOuter(0))
     .call((g) => g.select('.domain').style('stroke', 'var(--cds-chart-axis)')).call((g) => g.selectAll('line').style('stroke', 'var(--cds-chart-axis)'));
