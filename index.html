@@ -160,6 +160,7 @@ window.dash = (function () {
 .sc-card-top { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
 .sc-rank { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); font-variant-numeric: tabular-nums; }
 .sc-wk-total { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); font-variant-numeric: tabular-nums; }
+.sc-dot .v { display: none; }
 .sc-dot.gold { background: var(--sc-gold); border-color: var(--sc-gold); color: #1b1f24; font-weight: 600; }
 .sc-key-gold { display: inline-flex; align-items: center; gap: 6px; }
 
@@ -178,7 +179,11 @@ window.dash = (function () {
   .sc-big { font-size: 22px; }
   .sc-big small { font-size: 12px; }
   .sc-dots { gap: 2px; }
-  .sc-dot { height: 18px; font-size: 9px; border-radius: 3px; }
+  .sc-dot { height: 30px; font-size: 9px; border-radius: 3px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; line-height: 1; min-width: 0; }
+  .sc-dot .l { font-size: 8px; opacity: .75; }
+  .sc-dot .v { display: block; font-size: 9.5px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -.3px; }
+  .sc-dot.miss .v { color: var(--color-fg-muted); }
+  .sc-card .sc-dots-note { display: none; }
   .sc-pill { font-size: 11px; padding: 1px 6px; }
   .sc-card { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; row-gap: 6px; align-items: baseline; }
   .sc-card-top, .sc-card .sc-dots, .sc-card .sc-pill { grid-column: 1 / -1; }
@@ -423,7 +428,10 @@ dash.draw('cards', (el) => {
       const row = lg.data.find((r) => r.name === p.name && r.date === d);
       const dot = document.createElement('span');
       dot.className = 'sc-dot' + (row ? (+row.steps >= sc.GOLD ? ' gold' : row.met === 'YES' ? ' met' : ' miss') : '');
-      dot.textContent = letters[i];
+      const lt = document.createElement('span'); lt.className = 'l'; lt.textContent = letters[i];
+      const vv = document.createElement('span'); vv.className = 'v';
+      if (row && row.steps !== null && row.steps !== '') { const k = +row.steps / 1000; vv.textContent = k >= 10 ? Math.round(k) : k.toFixed(1); }
+      dot.append(lt, vv);
       dot.title = sc.fmtDay(sc.parse(d)) + (row ? ': ' + (row.steps ? sc.num(+row.steps) + ' steps' : 'unknown') : (d > latest ? ': not yet' : ': not logged'));
       dots.append(dot);
     });
