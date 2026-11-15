@@ -162,6 +162,14 @@ window.dash = (function () {
 .sc-wk-total { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); font-variant-numeric: tabular-nums; }
 .sc-actions { display: flex; gap: 8px; flex: none; }
 .sc-star { color: var(--sc-gold); margin-right: 4px; font-size: .95em; }
+.sc { --sc-plat: #e6edf5; --sc-plat-glow: rgba(205, 225, 255, .45); } .sc.light { --sc-plat: #6f7f92; --sc-plat-glow: rgba(120, 150, 190, .35); }
+.sc .plat { font-weight: 600; background: linear-gradient(100deg, var(--sc-plat) 20%, #ffffff 45%, #b9c7d8 60%, var(--sc-plat) 80%); background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: sc-sheen 6s ease-in-out infinite; }
+.sc.light .plat { background: linear-gradient(100deg, #5d6c7e 20%, #9fb0c4 45%, #4f5d6d 60%, #5d6c7e 80%); background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; }
+.sc-star.plat { color: var(--sc-plat); background: none; -webkit-text-fill-color: currentColor; text-shadow: 0 0 6px var(--sc-plat-glow); animation: none; }
+.sc-card.plat-card { border-color: var(--sc-plat); box-shadow: inset 0 0 0 1px var(--sc-plat), 0 0 0 0 var(--sc-plat-glow); animation: sc-glow 3.2s ease-in-out infinite; }
+@keyframes sc-glow { 0%, 100% { box-shadow: inset 0 0 0 1px var(--sc-plat), 0 0 4px 0 var(--sc-plat-glow); } 50% { box-shadow: inset 0 0 0 1px var(--sc-plat), 0 0 14px 2px var(--sc-plat-glow); } }
+@keyframes sc-sheen { 0%, 100% { background-position: 100% 0; } 50% { background-position: 0 0; } }
+@media (prefers-reduced-motion: reduce) { .sc-card.plat-card, .sc .plat { animation: none; } }
 .sc-ms { position: relative; min-width: 180px; }
 .sc-ms-btn { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; font: inherit; font-size: var(--cds-font-size-body); color: var(--color-fg); background: var(--color-bg); border: 1px solid var(--sc-line); border-radius: var(--cds-radius); padding: 6px 10px; cursor: pointer; text-align: left; }
 .sc-ms-btn .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -389,6 +397,16 @@ sc.goldNames = () => {
   const n = d3.rollup(lg.data.filter((r) => r.date >= wk && r.date <= last && +r.steps >= sc.GOLD), (v) => v.length, (r) => r.name);
   return new Set([...n].filter(([, c]) => c >= 2).map(([k]) => k));
 };
+// platinum = 4+ days at 10,000+ in the current week (takes over from gold)
+sc.platNames = () => {
+  const lg = dash.data('log');
+  if (lg.status !== 'ok' || !lg.data || !lg.data.length) return new Set();
+  const last = lg.data.map((r) => r.date).sort().pop();
+  const wk = sc.monday(last);
+  const n = d3.rollup(lg.data.filter((r) => r.date >= wk && r.date <= last && +r.steps >= sc.GOLD), (v) => v.length, (r) => r.name);
+  return new Set([...n].filter(([, c]) => c >= 4).map(([k]) => k));
+};
+sc.star = (plat) => { const st = document.createElement('span'); st.className = 'sc-star' + (plat ? ' plat' : ''); st.textContent = '★'; st.title = plat ? '4+ days at 10,000 this week' : '2+ days at 10,000 this week'; return st; };
 sc.monday = (iso) => { const d = d3.utcParse('%Y-%m-%d')(iso); return d3.utcFormat('%Y-%m-%d')(d3.utcMonday.floor(d)); };
 
 dash.calc('weekly', {
@@ -484,15 +502,15 @@ dash.draw('cards', (el) => {
   const start = sm.data[0].week_start, latest = sm.data[0].latest_date;
   const days = d3.range(7).map((i) => d3.utcFormat('%Y-%m-%d')(d3.utcDay.offset(sc.parse(start), i)));
   const letters = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-  const goldSet = sc.goldNames();
+  const goldSet = sc.goldNames(), platSet = sc.platNames();
   const wkTotal = (n) => d3.sum(lg.data.filter((r) => r.name === n && r.date >= start && r.date <= days[6]), (r) => +r.steps || 0);
   const ranked = [...s.data].map((p) => ({ ...p, wk_total: wkTotal(p.name) })).sort((a, b) => b.wk_total - a.wk_total || d3.ascending(a.name, b.name));
   el.replaceChildren(...ranked.map((p, idx) => {
-    const isGold = goldSet.has(p.name);
-    const card = document.createElement('div'); card.className = 'sc-card' + (isGold ? ' gold-card' : p.this_week >= 3 ? ' done-card' : ''); card.id = 'card-' + p.name.replace(/\W+/g, '-');
+    const isPlat = platSet.has(p.name), isGold = !isPlat && goldSet.has(p.name);
+    const card = document.createElement('div'); card.className = 'sc-card' + (isPlat ? ' plat-card' : isGold ? ' gold-card' : p.this_week >= 3 ? ' done-card' : ''); card.id = 'card-' + p.name.replace(/\W+/g, '-');
     const top = document.createElement('div'); top.className = 'sc-card-top';
-    const nm = document.createElement('div'); nm.className = 'sc-card-name' + (isGold ? ' gold' : '');
-    if (isGold) { const st = document.createElement('span'); st.className = 'sc-star'; st.textContent = '★'; st.title = '2+ days at 10,000 this week'; nm.prepend(st); }
+    const nm = document.createElement('div'); nm.className = 'sc-card-name' + (isPlat ? ' plat' : isGold ? ' gold' : '');
+    if (isPlat || isGold) nm.prepend(sc.star(isPlat));
     const rk = document.createElement('span'); rk.className = 'sc-rank'; rk.textContent = '#' + (idx + 1);
     top.append(nm, rk);
     const tot = document.createElement('div'); tot.className = 'sc-wk-total';
@@ -785,7 +803,7 @@ dash.draw('table', (tb) => {
   const lg = dash.data('log'), w = dash.data('weekly');
   if (lg.status !== 'ok') { tb.replaceChildren(); return; }
   const rows = lg.data.filter(sc.pick);
-  const gold = sc.goldNames();
+  const gold = sc.goldNames(), plat = sc.platNames();
   const sun = (wk) => d3.utcFormat('%Y-%m-%d')(d3.utcDay.offset(sc.parse(wk), 6));
   const wrows = w.status === 'ok' && w.data ? w.data.filter((x) => x.in_progress === 'no' && x.goal_met === 'yes' && (!sc.to || x.week <= sc.to) && (!sc.from || sun(x.week) >= sc.from)) : [];
   const names = [...new Set(rows.map((r) => r.name))];
@@ -806,8 +824,8 @@ dash.draw('table', (tb) => {
     const bestTxt = p.best ? sc.num(+p.best.steps) + ' (' + sc.fmtShort(sc.parse(p.best.date)) + ')' : '—';
     [p.n, p.met, p.rate + '%', p.weeks, p.avg === null ? '—' : sc.num(p.avg), sc.num(p.total), bestTxt].forEach((v, i) => {
       const td = document.createElement('td'); td.textContent = v;
-      if ((i === 0 && gold.has(p.n)) || (i === 6 && p.best && +p.best.steps >= sc.GOLD)) td.className = 'gold';
-      if (i === 0 && gold.has(p.n)) { const st = document.createElement('span'); st.className = 'sc-star'; st.textContent = '★'; st.title = '2+ days at 10,000 this week'; td.prepend(st); }
+      if (i === 6 && p.best && +p.best.steps >= sc.GOLD) td.className = 'gold';
+      if (i === 0 && (plat.has(p.n) || gold.has(p.n))) { td.className = plat.has(p.n) ? 'plat' : 'gold'; td.prepend(sc.star(plat.has(p.n))); }
       tr.append(td);
     });
     return tr;
