@@ -389,7 +389,7 @@ sc.people = sc.people || [];
 sc.picked = (n) => !sc.people.length || sc.people.includes(n);
 sc.pickLabel = () => (!sc.people.length ? '' : sc.people.length <= 2 ? sc.people.join(', ') : sc.people.length + ' people');
 sc.pick = (r) => sc.inRange(r.date) && sc.picked(r.name);
-sc.redraw = (skip) => { ['daily', 'table', 'logrows', 'rangelabel', 'from', 'to', 'who', 'week'].filter((n) => n !== skip).forEach((n) => dash.draw(n)); sc.save(); };
+sc.redraw = (skip) => { ['cards', 'weeklabel', 'daily', 'table', 'logrows', 'rangelabel', 'from', 'to', 'who', 'week'].filter((n) => n !== skip).forEach((n) => dash.draw(n)); sc.save(); };
 sc.parse = d3.utcParse('%Y-%m-%d');
 sc.fmtDay = d3.utcFormat('%a %b %-d');
 sc.fmtShort = d3.utcFormat('%b %-d');
@@ -397,25 +397,32 @@ sc.num = d3.format(',');
 sc.GOLD = 10000;
 sc.PLAT = 15000;
 // names at 10,000+ on the latest logged day
-sc.goldNames = () => {
+sc.goldNames = (week) => {
   const lg = dash.data('log');
   if (lg.status !== 'ok' || !lg.data || !lg.data.length) return new Set();
-  // gold = 2+ days at 10,000+ in the current (latest) Mon-Sun week
-  const last = lg.data.map((r) => r.date).sort().pop();
-  const wk = sc.monday(last);
+  // gold = 2+ days at 10,000+ in the given Mon-Sun week (default: the current one)
+  const wk = week || sc.monday(lg.data.map((r) => r.date).sort().pop());
+  const last = d3.utcFormat('%Y-%m-%d')(d3.utcDay.offset(sc.parse(wk), 6));
   const n = d3.rollup(lg.data.filter((r) => r.date >= wk && r.date <= last && +r.steps >= sc.GOLD), (v) => v.length, (r) => r.name);
   return new Set([...n].filter(([, c]) => c >= 2).map(([k]) => k));
 };
 // platinum = 4+ days at 10,000+ in the current week (takes over from gold)
-sc.platNames = () => {
+sc.platNames = (week) => {
   const lg = dash.data('log');
   if (lg.status !== 'ok' || !lg.data || !lg.data.length) return new Set();
-  const last = lg.data.map((r) => r.date).sort().pop();
-  const wk = sc.monday(last);
+  const wk = week || sc.monday(lg.data.map((r) => r.date).sort().pop());
+  const last = d3.utcFormat('%Y-%m-%d')(d3.utcDay.offset(sc.parse(wk), 6));
   const n = d3.rollup(lg.data.filter((r) => r.date >= wk && r.date <= last && +r.steps >= sc.GOLD), (v) => v.length, (r) => r.name);
   return new Set([...n].filter(([, c]) => c >= 4).map(([k]) => k));
 };
 sc.star = (plat) => { const st = document.createElement('span'); st.className = 'sc-star' + (plat ? ' plat' : ''); st.textContent = '★'; st.title = plat ? '4+ days at 10,000 this week' : '2+ days at 10,000 this week'; return st; };
+// the week the cards show: the week picked in the filter, otherwise the latest week
+sc.cardWeek = () => {
+  const sm = dash.data('summary');
+  const cur = sm.status === 'ok' && sm.data && sm.data.length ? sm.data[0].week_start : null;
+  if (sc.from && sc.to && sc.parse(sc.from) && sc.monday(sc.from) === sc.from && d3.utcFormat('%Y-%m-%d')(d3.utcDay.offset(sc.parse(sc.from), 6)) === sc.to) return { start: sc.from, current: sc.from === cur };
+  return { start: cur, current: true };
+};
 sc.monday = (iso) => { const d = d3.utcParse('%Y-%m-%d')(iso); return d3.utcFormat('%Y-%m-%d')(d3.utcMonday.floor(d)); };
 
 dash.calc('weekly', {
@@ -501,19 +508,23 @@ dash.draw('lede', (el) => {
 dash.draw('weeklabel', (el) => {
   const s = dash.data('summary');
   if (s.status !== 'ok' || !s.data || !s.data.length) { el.textContent = '—'; return; }
-  const start = sc.parse(s.data[0].week_start);
+  const cw = sc.cardWeek();
+  const start = sc.parse(cw.start);
   el.textContent = sc.fmtShort(start) + ' – ' + sc.fmtShort(d3.utcDay.offset(start, 6));
+  const h = el.parentNode && el.parentNode.querySelector('h2');
+  if (h) h.textContent = cw.current ? 'This week' : 'Week of ' + sc.fmtShort(start);
 });
 
 dash.draw('cards', (el) => {
   const s = dash.data('standings'), lg = dash.data('log'), sm = dash.data('summary');
   if (s.status !== 'ok' || !s.data || lg.status !== 'ok' || sm.status !== 'ok' || !sm.data) { el.replaceChildren(); return; }
-  const start = sm.data[0].week_start, latest = sm.data[0].latest_date;
+  const cw = sc.cardWeek(), start = cw.start, isCurrent = cw.current, latest = sm.data[0].latest_date;
   const days = d3.range(7).map((i) => d3.utcFormat('%Y-%m-%d')(d3.utcDay.offset(sc.parse(start), i)));
   const letters = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-  const goldSet = sc.goldNames(), platSet = sc.platNames();
+  const goldSet = sc.goldNames(start), platSet = sc.platNames(start);
+  const wkMet = (n) => lg.data.filter((r) => r.name === n && r.date >= start && r.date <= days[6] && r.met === 'YES').length;
   const wkTotal = (n) => d3.sum(lg.data.filter((r) => r.name === n && r.date >= start && r.date <= days[6]), (r) => +r.steps || 0);
-  const ranked = [...s.data].map((p) => ({ ...p, wk_total: wkTotal(p.name) })).sort((a, b) => b.wk_total - a.wk_total || d3.ascending(a.name, b.name));
+  const ranked = [...s.data].map((p) => ({ ...p, this_week: wkMet(p.name), wk_total: wkTotal(p.name) })).sort((a, b) => b.wk_total - a.wk_total || d3.ascending(a.name, b.name));
   el.replaceChildren(...ranked.map((p, idx) => {
     const isPlat = platSet.has(p.name), isGold = !isPlat && goldSet.has(p.name);
     const card = document.createElement('div'); card.className = 'sc-card' + (isPlat ? ' plat-card' : isGold ? ' gold-card' : p.this_week >= 3 ? ' done-card' : ''); card.id = 'card-' + p.name.replace(/\W+/g, '-');
@@ -525,7 +536,7 @@ dash.draw('cards', (el) => {
     const tot = document.createElement('div'); tot.className = 'sc-wk-total';
     tot.textContent = sc.num(p.wk_total); const u = document.createElement('span'); u.className = 'u'; u.textContent = ' steps'; tot.append(u); nm.append(document.createTextNode(p.name));
     const big = document.createElement('div'); big.className = 'sc-big';
-    const v = document.createElement('span'); v.dataset.source = 'standings'; v.dataset.field = 'this_week'; v.dataset.where = 'name=' + encodeURIComponent(p.name).replace(/%20/g, ' ');
+    const v = document.createElement('span'); if (isCurrent) { v.dataset.source = 'standings'; v.dataset.field = 'this_week'; v.dataset.where = 'name=' + encodeURIComponent(p.name).replace(/%20/g, ' '); }
     v.textContent = p.this_week;
     const of = document.createElement('small'); of.textContent = ' / 3';
     big.append(v, of);
