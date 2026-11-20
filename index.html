@@ -124,6 +124,12 @@ window.dash = (function () {
 .sc tr > :first-child { border-left: 0; } .sc tr > :last-child { border-right: 0; }
 .sc thead tr:first-child > * { border-top: 0; } .sc tbody tr:last-child > * { border-bottom: 0; }
 .sc thead th { background: var(--sc-head); color: var(--color-fg); }
+.sc th.sc-sort { cursor: pointer; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+.sc th.sc-sort.on { color: var(--color-fg); }
+@media (hover: hover) { .sc th.sc-sort:hover { background: color-mix(in srgb, var(--color-fg) 14%, var(--color-panel)); } }
+.sc th.sc-sort:focus-visible { outline: 2px solid var(--color-fg-muted); outline-offset: -2px; }
+.sc th .sc-arrow { display: inline-block; margin-left: 4px; font-size: .8em; opacity: .35; }
+.sc th.sc-sort.on .sc-arrow { opacity: 1; }
 .sc tbody tr:nth-child(even) td { background: var(--sc-zebra); }
 .sc details > summary { cursor: pointer; font-weight: var(--cds-font-weight-medium); padding: var(--cds-pad-xs) 0; }
 .sc details[open] > summary { margin-bottom: var(--cds-gap-sm); }
@@ -361,7 +367,7 @@ window.sc = window.sc || { people: [], from: '', to: '' };
 sc.KEY = 'sc_view';
 sc.save = () => {
   const page = document.getElementById('sc-page');
-  const v = JSON.stringify({ people: sc.people || [], from: sc.from || '', to: sc.to || '', span: sc.span || 'week', light: !!(page && page.classList.contains('light')) });
+  const v = JSON.stringify({ people: sc.people || [], from: sc.from || '', to: sc.to || '', span: sc.span || 'week', sort: sc.sort || null, light: !!(page && page.classList.contains('light')) });
   try { document.cookie = sc.KEY + '=' + encodeURIComponent(v) + '; max-age=31536000; path=/; SameSite=Lax'; } catch (e) {}
   try { localStorage.setItem(sc.KEY, v); } catch (e) {}
 };
@@ -376,7 +382,7 @@ sc.clearSaved = () => {
   if (!raw) return;
   try {
     const v = JSON.parse(raw);
-    sc.people = Array.isArray(v.people) ? v.people : (v.who ? [v.who] : []); sc.from = v.from || ''; sc.to = v.to || ''; sc.span = v.span || 'week';
+    sc.people = Array.isArray(v.people) ? v.people : (v.who ? [v.who] : []); sc.from = v.from || ''; sc.to = v.to || ''; sc.span = v.span || 'week'; sc.sort = v.sort && v.sort.key ? v.sort : null;
     if (v.light) document.querySelectorAll('#sc-page').forEach((p) => p.classList.add('light'));
   } catch (e) {}
 })();
@@ -705,7 +711,7 @@ dash.draw('week', (sel) => {
 dash.draw('rangelabel', (el) => {
   document.querySelectorAll('#reset').forEach((b) => {
     b.onclick = () => {
-      sc.from = ''; sc.to = ''; sc.people = []; sc.span = 'week'; sc.hl = null; sc.hover = null;
+      sc.from = ''; sc.to = ''; sc.people = []; sc.span = 'week'; sc.sort = null; sc.hl = null; sc.hover = null;
       document.querySelectorAll('#sc-page').forEach((p) => p.classList.remove('light'));
       sc.clearSaved(); sc.redraw(); sc.clearSaved();
     };
@@ -848,7 +854,34 @@ dash.draw('table', (tb) => {
     const best = counted.reduce((a, r) => (a && +a.steps >= +r.steps ? a : r), null);
     return { n, met, rate: mine.length ? Math.round((100 * met) / mine.length) : 0, weeks: wrows.filter((x) => x.name === n).length,
       avg: counted.length ? Math.round(d3.mean(counted, (r) => +r.steps)) : null, total: d3.sum(counted, (r) => +r.steps), best };
-  }).sort((a, b) => b.met - a.met || b.total - a.total || d3.ascending(a.n, b.n));
+  });
+  // sortable headers: click a column to sort by it, click again to flip the order
+  const keys = ['n', 'met', 'rate', 'weeks', 'avg', 'total', 'best'];
+  const val = (p, k) => (k === 'best' ? (p.best ? +p.best.steps : -1) : k === 'avg' ? (p.avg === null ? -1 : p.avg) : p[k]);
+  const srt = sc.sort && keys.includes(sc.sort.key) ? sc.sort : null;
+  stats.sort((a, b) => {
+    if (srt) {
+      const c = srt.key === 'n' ? d3.ascending(a.n.toLowerCase(), b.n.toLowerCase()) : d3.ascending(val(a, srt.key), val(b, srt.key));
+      if (c) return srt.dir === 'asc' ? c : -c;
+    }
+    return b.met - a.met || b.total - a.total || d3.ascending(a.n, b.n);
+  });
+  const ths = tb.closest('table') ? tb.closest('table').querySelectorAll('thead th') : [];
+  ths.forEach((th, i) => {
+    const k = keys[i]; if (!k) return;
+    if (!th.dataset.label) th.dataset.label = th.textContent;
+    th.className = 'sc-sort' + (srt && srt.key === k ? ' on' : '');
+    th.setAttribute('aria-sort', srt && srt.key === k ? (srt.dir === 'asc' ? 'ascending' : 'descending') : 'none');
+    th.tabIndex = 0; th.title = 'Sort by ' + th.dataset.label;
+    const ar = document.createElement('span'); ar.className = 'sc-arrow'; ar.textContent = srt && srt.key === k ? (srt.dir === 'asc' ? '▲' : '▼') : '↕';
+    th.replaceChildren(th.dataset.label, ar);
+    const go = () => {
+      sc.sort = srt && srt.key === k ? { key: k, dir: srt.dir === 'asc' ? 'desc' : 'asc' } : { key: k, dir: k === 'n' ? 'asc' : 'desc' };
+      dash.draw('table'); sc.save();
+    };
+    th.onclick = go;
+    th.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
+  });
   if (!stats.length) {
     const tr = document.createElement('tr'); const td = document.createElement('td'); td.colSpan = 7; td.textContent = 'No data'; tr.append(td);
     tb.replaceChildren(tr); return;
@@ -858,8 +891,10 @@ dash.draw('table', (tb) => {
     const bestTxt = p.best ? sc.num(+p.best.steps) + ' (' + sc.fmtShort(sc.parse(p.best.date)) + ')' : '—';
     [p.n, p.met, p.rate + '%', p.weeks, p.avg === null ? '—' : sc.num(p.avg), sc.num(p.total), bestTxt].forEach((v, i) => {
       const td = document.createElement('td'); td.textContent = v;
-      if (i === 6 && p.best && +p.best.steps >= sc.GOLD) td.className = +p.best.steps >= sc.PLAT ? 'plat' : 'gold';
-      if (i === 0 && (plat.has(p.n) || gold.has(p.n))) { td.className = plat.has(p.n) ? 'plat' : 'gold'; td.prepend(sc.star(plat.has(p.n))); }
+      // platinum text goes in a span: its sheen uses background-clip, which the striped row background would hide on a td
+      const platTxt = () => { const sp = document.createElement('span'); sp.className = 'plat'; sp.textContent = v; td.replaceChildren(sp); };
+      if (i === 6 && p.best && +p.best.steps >= sc.GOLD) { if (+p.best.steps >= sc.PLAT) platTxt(); else td.className = 'gold'; }
+      if (i === 0 && (plat.has(p.n) || gold.has(p.n))) { if (plat.has(p.n)) platTxt(); else td.className = 'gold'; td.prepend(sc.star(plat.has(p.n))); }
       tr.append(td);
     });
     return tr;
@@ -874,7 +909,7 @@ dash.draw('logrows', (tb) => {
     tr.dataset.key = encodeURIComponent(r.date) + ',' + encodeURIComponent(r.name).replace(/%20/g, ' ');
     const vals = [sc.fmtDay(sc.parse(r.date)), r.name, r.steps ? sc.num(+r.steps) : 'unknown', r.met === 'YES' ? 'Yes' : r.met === 'NO' ? 'No' : 'Check'];
     const big = +r.steps >= sc.GOLD;
-    vals.forEach((v, i) => { const td = document.createElement('td'); td.textContent = v; if (big && i === 2) td.className = +r.steps >= sc.PLAT ? 'plat' : 'gold'; if (i === 3) td.className = r.met === 'YES' ? 'sc-yes' : r.met === 'NO' ? 'sc-no' : 'sc-unk'; tr.append(td); });
+    vals.forEach((v, i) => { const td = document.createElement('td'); td.textContent = v; if (big && i === 2) { if (+r.steps >= sc.PLAT) { const sp = document.createElement('span'); sp.className = 'plat'; sp.textContent = v; td.replaceChildren(sp); } else td.className = 'gold'; } if (i === 3) td.className = r.met === 'YES' ? 'sc-yes' : r.met === 'NO' ? 'sc-no' : 'sc-unk'; tr.append(td); });
     return tr;
   }));
 });
