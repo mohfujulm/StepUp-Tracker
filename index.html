@@ -160,10 +160,12 @@ window.dash = (function () {
 .sc-key.dim { opacity: .4; }
 .sc-chart { min-height: 340px; }
 #sc-page .sc-chart.sc-gchart[data-draw] { min-height: 0; }
-.sc .sc-gbar { fill: var(--sc-plat); opacity: .85; transition: opacity .15s; }
-.sc.light .sc-gbar { fill: #6f7f92; }
-.sc .sc-gbar.on { opacity: 1; }
-.sc .sc-gbar.dim { opacity: .45; }
+.sc .sc-gdot { fill: var(--sc-plat); stroke: var(--color-panel); stroke-width: 2; pointer-events: none; }
+.sc.light .sc-gdot { fill: #5d6c7e; }
+.sc .sc-gdot.on { fill: #ffffff; stroke: var(--sc-plat); }
+.sc.light .sc-gdot.on { fill: #1b1f24; stroke: #5d6c7e; }
+.sc .sc-trend { stroke: var(--sc-gold); stroke-width: 2; stroke-linecap: round; pointer-events: none; }
+.sc .sc-legend i.trend { background: var(--sc-gold); }
 .sc { --sc-gold: #ffc83d; } .sc.light { --sc-gold: #b07d00; }
 .sc .gold { color: var(--sc-gold); font-weight: 600; }
 .sc-card.gold-card { border-color: var(--sc-gold); box-shadow: inset 0 0 0 1px var(--sc-gold); }
@@ -963,39 +965,56 @@ dash.draw('grouptotal', (el) => {
   const head = document.createElement('div'); head.className = 'sc-legend';
   const gl = document.createElement('span'); const gi = document.createElement('i'); gi.style.background = 'var(--cds-chart-reference)';
   gl.append(gi, 'Everyone at 5,000 (' + sc.num(g.members * 5000) + ')'); head.append(gl); el.append(head);
-  const W = Math.max(300, el.clientWidth), H = 260, m = { t: 26, r: 16, b: 30, l: 44 };
-  const x = d3.scaleBand().domain(g.days.map((d) => +d)).range([m.l, W - m.r]).paddingInner(g.days.length > 20 ? 0.15 : 0.3).paddingOuter(0.1);
+  const W = Math.max(300, el.clientWidth), H = 260, m = { t: 26, r: 18, b: 30, l: 44 };
+  const pad = g.days.length > 1 ? 0 : 1;
+  const x = d3.scaleUtc().domain([d3.utcDay.offset(g.start, -pad), d3.utcDay.offset(g.end, pad)]).range([m.l + 14, W - m.r - 14]);
   const ref = g.members * 5000; // everyone at 5,000
-  const maxV = d3.max(g.pts, (p) => p.total) || 0;
-  const y = d3.scaleLinear().domain([0, Math.max(ref * 1.1, maxV * 1.08)]).nice().range([H - m.b, m.t]);
+  const got = g.pts.filter((p) => p.total !== null);
+  const maxV = d3.max(got, (p) => p.total) || 0;
+  const y = d3.scaleLinear().domain([0, Math.max(ref * 1.1, maxV * 1.1)]).nice().range([H - m.b, m.t]);
   const tf = sc.span === 'week' ? d3.utcFormat('%a %-d') : d3.utcFormat('%b %-d');
   const every = Math.max(1, Math.ceil(g.days.length / Math.max(2, Math.floor((W - m.l - m.r) / 58))));
   const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img')
-    .attr('aria-label', 'Group total steps per day from ' + sc.fmtShort(g.start) + ' to ' + sc.fmtShort(g.end));
+    .attr('aria-label', 'Group total steps per day from ' + sc.fmtShort(g.start) + ' to ' + sc.fmtShort(g.end) + ', with a trend line');
   svg.append('g').attr('transform', `translate(0,${H - m.b})`)
-    .call(d3.axisBottom(x).tickValues(g.days.filter((_, i) => i % every === 0).map((d) => +d)).tickFormat((v) => tf(new Date(v))).tickSizeOuter(0))
+    .call(d3.axisBottom(x).tickValues(g.days.filter((_, i) => i % every === 0)).tickFormat(tf).tickSizeOuter(0))
     .call((a) => a.select('.domain').style('stroke', 'var(--cds-chart-axis)')).call((a) => a.selectAll('line').style('stroke', 'var(--cds-chart-axis)'));
   svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5).tickFormat(d3.format('~s')).tickSize(-(W - m.l - m.r)))
     .call((a) => a.select('.domain').remove()).call((a) => a.selectAll('line').style('stroke', 'var(--cds-chart-grid)'));
-  const bars = svg.append('g').selectAll('rect').data(g.pts.filter((p) => p.total !== null)).join('rect')
-    .attr('x', (p) => x(+p.date)).attr('width', x.bandwidth()).attr('y', (p) => y(p.total)).attr('height', (p) => y(0) - y(p.total))
-    .attr('rx', Math.min(4, x.bandwidth() / 4)).attr('class', 'sc-gbar');
   svg.append('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', y(ref)).attr('y2', y(ref))
     .style('stroke', 'var(--cds-chart-reference)').style('stroke-dasharray', '4 3').style('stroke-width', 1.5).style('pointer-events', 'none');
-  const showVals = x.bandwidth() >= 26;
+  // least-squares trend line through the logged days (needs at least 2)
+  if (got.length >= 2) {
+    const xs = got.map((p) => +p.date / 864e5), ys = got.map((p) => p.total);
+    const mx = d3.mean(xs), my = d3.mean(ys);
+    const den = d3.sum(xs, (v) => (v - mx) ** 2);
+    const slope = den ? d3.sum(xs, (v, i) => (v - mx) * (ys[i] - my)) / den : 0;
+    const at = (d) => my + slope * (+d / 864e5 - mx);
+    const a = got[0].date, b = got[got.length - 1].date;
+    svg.append('line').attr('class', 'sc-trend').attr('x1', x(a)).attr('x2', x(b)).attr('y1', y(Math.max(0, at(a)))).attr('y2', y(Math.max(0, at(b))));
+    const perDay = Math.round(slope);
+    const tl = document.createElement('span'); const ti = document.createElement('i'); ti.className = 'trend';
+    tl.append(ti, 'Trend ' + (perDay >= 0 ? '+' : '−') + sc.num(Math.abs(perDay)) + ' steps a day'); head.append(tl);
+  }
+  const dots = svg.append('g').selectAll('circle').data(got).join('circle')
+    .attr('cx', (p) => x(p.date)).attr('cy', (p) => y(p.total)).attr('r', 5.5).attr('class', 'sc-gdot');
+  const gap = got.length > 1 ? (x(got[got.length - 1].date) - x(got[0].date)) / (got.length - 1) : 999;
+  const showVals = gap >= 40;
   const vfmt = (v) => (v >= 100000 ? Math.round(v / 1000) + 'k' : (v / 1000).toFixed(1) + 'k');
   const labels = svg.append('g').style('pointer-events', 'none');
+  const rule = svg.append('line').attr('y1', m.t).attr('y2', H - m.b).style('stroke', 'var(--cds-chart-axis)').style('display', 'none').style('pointer-events', 'none');
   const draw = (hi) => {
     labels.selectAll('*').remove();
-    bars.classed('on', (p) => hi && +p.date === +hi.date).classed('dim', (p) => hi && +p.date !== +hi.date);
-    g.pts.filter((p) => p.total !== null && (showVals || (hi && +p.date === +hi.date))).forEach((p) => {
-      labels.append('text').attr('x', x(+p.date) + x.bandwidth() / 2).attr('y', y(p.total) - 6).attr('text-anchor', 'middle')
+    dots.classed('on', (p) => hi && +p.date === +hi.date).attr('r', (p) => (hi && +p.date === +hi.date ? 7 : 5.5));
+    if (hi) rule.attr('x1', x(hi.date)).attr('x2', x(hi.date)).style('display', null); else rule.style('display', 'none');
+    got.filter((p) => showVals || (hi && +p.date === +hi.date)).forEach((p) => {
+      labels.append('text').attr('x', x(p.date)).attr('y', y(p.total) - (hi && +p.date === +hi.date ? 15 : 12)).attr('text-anchor', 'middle')
         .text(hi && +p.date === +hi.date ? sc.num(p.total) : vfmt(p.total))
         .style('fill', 'var(--color-fg)').style('font-size', '11px').style('font-weight', 600).style('font-variant-numeric', 'tabular-nums')
         .style('paint-order', 'stroke').style('stroke', 'var(--color-panel)').style('stroke-width', 4).style('stroke-linejoin', 'round');
     });
     if (hi) {
-      const cx = Math.min(Math.max(x(+hi.date) + x.bandwidth() / 2, m.l + 70), W - m.r - 70);
+      const cx = Math.min(Math.max(x(hi.date), m.l + 70), W - m.r - 70);
       labels.append('text').attr('x', cx).attr('y', 12).attr('text-anchor', 'middle')
         .text(sc.fmtDay(hi.date) + ' · ' + hi.hit + ' of ' + hi.people + ' at 5,000+')
         .style('fill', 'var(--color-fg)').style('font-size', '12px').style('font-weight', 600);
@@ -1004,10 +1023,10 @@ dash.draw('grouptotal', (el) => {
   svg.append('rect').attr('x', m.l).attr('y', m.t).attr('width', W - m.l - m.r).attr('height', H - m.t - m.b).style('fill', 'transparent')
     .on('pointermove', (ev) => {
       const px = d3.pointer(ev)[0];
-      const hit = g.pts.filter((p) => p.total !== null).reduce((a, p) => (!a || Math.abs(x(+p.date) + x.bandwidth() / 2 - px) < Math.abs(x(+a.date) + x.bandwidth() / 2 - px) ? p : a), null);
-      draw(hit);
+      draw(got.reduce((a, p) => (!a || Math.abs(x(p.date) - px) < Math.abs(x(a.date) - px) ? p : a), null));
     }).on('pointerleave', () => draw(null));
-  if (!g.pts.some((p) => p.total !== null)) svg.append('text').attr('x', W / 2).attr('y', H / 2).attr('text-anchor', 'middle').text('No days logged in this period yet');
+  dots.raise();
+  if (!got.length) svg.append('text').attr('x', W / 2).attr('y', H / 2).attr('text-anchor', 'middle').text('No days logged in this period yet');
   draw(null);
 });
 
