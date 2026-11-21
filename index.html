@@ -182,8 +182,19 @@ window.dash = (function () {
 .sc.light .sc-plat-badge .g0 { stop-color: #dfe5ec; } .sc.light .sc-plat-badge .g1 { stop-color: #8494a8; }
 .sc.light .sc-plat-badge .g2 { stop-color: #c3ccd7; } .sc.light .sc-plat-badge .g3 { stop-color: #5d6c7e; }
 @keyframes sc-glow { 0%, 100% { box-shadow: inset 0 0 0 1px var(--sc-plat), 0 0 4px 0 var(--sc-plat-glow); } 50% { box-shadow: inset 0 0 0 1px var(--sc-plat), 0 0 14px 2px var(--sc-plat-glow); } }
+/* double bright platinum: single days at 20,000+ */
+.sc-dot.pday.dpday { position: relative; overflow: hidden; background: linear-gradient(135deg, #ffffff 0%, #e4ebf3 40%, #ffffff 60%, #d2dce8 100%); border-color: #ffffff; color: #0f1318; box-shadow: 0 0 0 1px #ffffff, 0 0 0 3px rgba(225, 235, 248, .55), 0 0 12px 2px var(--sc-plat-glow); animation: sc-dglow 2.4s ease-in-out infinite; }
+.sc-dot.dpday::after { content: ''; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, .8) 50%, transparent 70%); background-size: 250% 100%; animation: sc-dsweep 2.8s ease-in-out infinite; pointer-events: none; z-index: 0; }
+.sc-dot.dpday > span { position: relative; z-index: 1; }
+.sc-dot.dpday .v { font-weight: 800; }
+.sc.light .sc-dot.pday.dpday { background: linear-gradient(135deg, #ffffff 0%, #c3cdd9 40%, #f2f5f9 60%, #9fadbd 100%); border-color: #5d6c7e; box-shadow: 0 0 0 1px #5d6c7e, 0 0 0 3px rgba(93, 108, 126, .35), 0 0 10px 2px var(--sc-plat-glow); }
+.sc .plat.dplat { background-image: linear-gradient(100deg, #ffffff 15%, var(--sc-plat) 35%, #ffffff 50%, #dfe8f3 65%, #ffffff 85%); animation-duration: 3s; filter: drop-shadow(0 0 4px var(--sc-plat-glow)); font-weight: 700; }
+.sc.light .plat.dplat { background-image: linear-gradient(100deg, #3f4b59 15%, #9fb0c4 35%, #2f3a46 50%, #8a9aae 65%, #3f4b59 85%); }
+.sc .sc-dpt { filter: drop-shadow(0 0 4px var(--sc-plat-glow)) drop-shadow(0 0 2px #ffffff); }
+@keyframes sc-dglow { 0%, 100% { box-shadow: 0 0 0 1px #ffffff, 0 0 0 3px rgba(225, 235, 248, .45), 0 0 8px 1px var(--sc-plat-glow); } 50% { box-shadow: 0 0 0 1px #ffffff, 0 0 0 3px rgba(225, 235, 248, .8), 0 0 18px 4px var(--sc-plat-glow); } }
+@keyframes sc-dsweep { 0% { background-position: 120% 0; } 60%, 100% { background-position: -20% 0; } }
 @keyframes sc-sheen { 0%, 100% { background-position: 100% 0; } 50% { background-position: 0 0; } }
-@media (prefers-reduced-motion: reduce) { .sc-card.plat-card, .sc .plat { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .sc-card.plat-card, .sc .plat, .sc-dot.pday.dpday, .sc-dot.dpday::after { animation: none; } }
 .sc-ms { position: relative; min-width: 180px; }
 .sc-ms-btn { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; font: inherit; font-size: var(--cds-font-size-body); color: var(--color-fg); background: var(--color-bg); border: 1px solid var(--sc-line); border-radius: var(--cds-radius); padding: 6px 10px; cursor: pointer; text-align: left; }
 .sc-ms-btn .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -402,6 +413,7 @@ sc.fmtShort = d3.utcFormat('%b %-d');
 sc.num = d3.format(',');
 sc.GOLD = 10000;
 sc.PLAT = 15000;
+sc.DPLAT = 20000; // double bright platinum day
 // names at 10,000+ on the latest logged day
 sc.goldNames = (week) => {
   const lg = dash.data('log');
@@ -550,7 +562,7 @@ dash.draw('cards', (el) => {
     days.forEach((d, i) => {
       const row = lg.data.find((r) => r.name === p.name && r.date === d);
       const dot = document.createElement('span');
-      dot.className = 'sc-dot' + (row ? (+row.steps >= sc.PLAT ? ' pday' : +row.steps >= sc.GOLD ? ' gold' : row.met === 'YES' ? ' met' : ' miss') : '');
+      dot.className = 'sc-dot' + (row ? (+row.steps >= sc.DPLAT ? ' pday dpday' : +row.steps >= sc.PLAT ? ' pday' : +row.steps >= sc.GOLD ? ' gold' : row.met === 'YES' ? ' met' : ' miss') : '');
       const lt = document.createElement('span'); lt.className = 'l'; lt.textContent = letters[i];
       const vv = document.createElement('span'); vv.className = 'v';
       if (row && row.steps !== null && row.steps !== '') { const k = +row.steps / 1000; vv.textContent = +row.steps < 1000 ? String(+row.steps) : (k >= 10 ? Math.round(k) : k.toFixed(1)) + 'k'; }
@@ -791,7 +803,7 @@ dash.draw('daily', (el) => {
     const g = svg.append('g');
     g.append('path').datum(s.pts).attr('d', line).style('fill', 'none').style('stroke', color(s.n)).style('stroke-width', 2.25).style('stroke-linejoin', 'round');
     g.append('g').selectAll('circle').data(s.pts.filter((p) => p.steps !== null)).join('circle')
-      .attr('cx', (p) => x(p.date)).attr('cy', (p) => y(p.steps)).attr('r', (p) => (p.steps >= sc.GOLD ? 5 : 3.5)).style('fill', (p) => (p.steps >= sc.PLAT ? 'var(--sc-plat)' : p.steps >= sc.GOLD ? 'var(--sc-gold)' : color(s.n))).style('stroke', (p) => (p.steps >= sc.GOLD ? color(s.n) : 'var(--color-panel)')).style('stroke-width', (p) => (p.steps >= sc.GOLD ? 2 : 1.5));
+      .attr('cx', (p) => x(p.date)).attr('cy', (p) => y(p.steps)).attr('class', (p) => (p.steps >= sc.DPLAT ? 'sc-dpt' : null)).attr('r', (p) => (p.steps >= sc.DPLAT ? 6.5 : p.steps >= sc.GOLD ? 5 : 3.5)).style('fill', (p) => (p.steps >= sc.DPLAT ? '#ffffff' : p.steps >= sc.PLAT ? 'var(--sc-plat)' : p.steps >= sc.GOLD ? 'var(--sc-gold)' : color(s.n))).style('stroke', (p) => (p.steps >= sc.GOLD ? color(s.n) : 'var(--color-panel)')).style('stroke-width', (p) => (p.steps >= sc.GOLD ? 2 : 1.5));
     g.append('path').datum(s.pts).attr('d', line).style('fill', 'none').style('stroke', 'transparent').style('stroke-width', 16).style('cursor', 'pointer')
       .on('pointerenter', () => { sc.hover = s.n; paint(); })
       .on('pointerleave', () => { sc.hover = null; paint(); });
@@ -892,8 +904,8 @@ dash.draw('table', (tb) => {
     [p.n, p.met, p.rate + '%', p.weeks, p.avg === null ? '—' : sc.num(p.avg), sc.num(p.total), bestTxt].forEach((v, i) => {
       const td = document.createElement('td'); td.textContent = v;
       // platinum text goes in a span: its sheen uses background-clip, which the striped row background would hide on a td
-      const platTxt = () => { const sp = document.createElement('span'); sp.className = 'plat'; sp.textContent = v; td.replaceChildren(sp); };
-      if (i === 6 && p.best && +p.best.steps >= sc.GOLD) { if (+p.best.steps >= sc.PLAT) platTxt(); else td.className = 'gold'; }
+      const platTxt = (dbl) => { const sp = document.createElement('span'); sp.className = dbl ? 'plat dplat' : 'plat'; sp.textContent = v; td.replaceChildren(sp); };
+      if (i === 6 && p.best && +p.best.steps >= sc.GOLD) { if (+p.best.steps >= sc.PLAT) platTxt(+p.best.steps >= sc.DPLAT); else td.className = 'gold'; }
       if (i === 0 && (plat.has(p.n) || gold.has(p.n))) { if (plat.has(p.n)) platTxt(); else td.className = 'gold'; td.prepend(sc.star(plat.has(p.n))); }
       tr.append(td);
     });
@@ -909,7 +921,7 @@ dash.draw('logrows', (tb) => {
     tr.dataset.key = encodeURIComponent(r.date) + ',' + encodeURIComponent(r.name).replace(/%20/g, ' ');
     const vals = [sc.fmtDay(sc.parse(r.date)), r.name, r.steps ? sc.num(+r.steps) : 'unknown', r.met === 'YES' ? 'Yes' : r.met === 'NO' ? 'No' : 'Check'];
     const big = +r.steps >= sc.GOLD;
-    vals.forEach((v, i) => { const td = document.createElement('td'); td.textContent = v; if (big && i === 2) { if (+r.steps >= sc.PLAT) { const sp = document.createElement('span'); sp.className = 'plat'; sp.textContent = v; td.replaceChildren(sp); } else td.className = 'gold'; } if (i === 3) td.className = r.met === 'YES' ? 'sc-yes' : r.met === 'NO' ? 'sc-no' : 'sc-unk'; tr.append(td); });
+    vals.forEach((v, i) => { const td = document.createElement('td'); td.textContent = v; if (big && i === 2) { if (+r.steps >= sc.PLAT) { const sp = document.createElement('span'); sp.className = +r.steps >= sc.DPLAT ? 'plat dplat' : 'plat'; sp.textContent = v; td.replaceChildren(sp); } else td.className = 'gold'; } if (i === 3) td.className = r.met === 'YES' ? 'sc-yes' : r.met === 'NO' ? 'sc-no' : 'sc-unk'; tr.append(td); });
     return tr;
   }));
 });
