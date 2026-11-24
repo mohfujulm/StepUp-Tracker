@@ -354,11 +354,10 @@ window.dash = (function () {
 
   <section class="sc-section" id="daily-steps">
     <div class="sc-row">
-      <h2>Daily steps</h2>
-      <div class="sc-seg" role="group" aria-label="Chart period">
-        <button type="button" class="sc-btn" data-span="week">Week</button>
-        <button type="button" class="sc-btn" data-span="month">Month</button>
-        <button type="button" class="sc-btn" data-span="range">Range</button>
+      <h2 id="steps-title">Daily steps</h2>
+      <div class="sc-seg" role="group" aria-label="Show steps by">
+        <button type="button" class="sc-btn" data-span="daily">Daily</button>
+        <button type="button" class="sc-btn" data-span="weekly">Weekly</button>
       </div>
     </div>
     <div class="sc-chart" data-draw="daily" data-source="log"></div>
@@ -393,7 +392,7 @@ window.sc = window.sc || { people: [], from: '', to: '' };
 sc.KEY = 'sc_view';
 sc.save = () => {
   const page = document.getElementById('sc-page');
-  const v = JSON.stringify({ people: sc.people || [], from: sc.from || '', to: sc.to || '', span: sc.span || 'week', sort: sc.sort || null, light: !!(page && page.classList.contains('light')) });
+  const v = JSON.stringify({ people: sc.people || [], from: sc.from || '', to: sc.to || '', span: sc.span || 'daily', sort: sc.sort || null, light: !!(page && page.classList.contains('light')) });
   try { document.cookie = sc.KEY + '=' + encodeURIComponent(v) + '; max-age=31536000; path=/; SameSite=Lax'; } catch (e) {}
   try { localStorage.setItem(sc.KEY, v); } catch (e) {}
 };
@@ -408,7 +407,7 @@ sc.clearSaved = () => {
   if (!raw) return;
   try {
     const v = JSON.parse(raw);
-    sc.people = Array.isArray(v.people) ? v.people : (v.who ? [v.who] : []); sc.from = v.from || ''; sc.to = v.to || ''; sc.span = v.span || 'week'; sc.sort = v.sort && v.sort.key ? v.sort : null;
+    sc.people = Array.isArray(v.people) ? v.people : (v.who ? [v.who] : []); sc.from = v.from || ''; sc.to = v.to || ''; sc.span = v.span === 'weekly' ? 'weekly' : 'daily'; sc.sort = v.sort && v.sort.key ? v.sort : null;
     if (v.light) document.querySelectorAll('#sc-page').forEach((p) => p.classList.add('light'));
   } catch (e) {}
 })();
@@ -738,7 +737,7 @@ dash.draw('week', (sel) => {
 dash.draw('rangelabel', (el) => {
   document.querySelectorAll('#reset').forEach((b) => {
     b.onclick = () => {
-      sc.from = ''; sc.to = ''; sc.people = []; sc.span = 'week'; sc.sort = null; sc.hl = null; sc.hover = null;
+      sc.from = ''; sc.to = ''; sc.people = []; sc.span = 'daily'; sc.sort = null; sc.hl = null; sc.hover = null;
       document.querySelectorAll('#sc-page').forEach((p) => p.classList.remove('light'));
       sc.clearSaved(); sc.redraw(); sc.clearSaved();
     };
@@ -761,12 +760,14 @@ sc.period = (allDates) => {
   return { start, end, todayIso, days: d3.utcDay.range(start, d3.utcDay.offset(end, 1)) };
 };
 dash.draw('daily', (el) => {
-  sc.span = sc.span || 'week';
+  sc.span = sc.span === 'weekly' ? 'weekly' : 'daily';
+  const weekly = sc.span === 'weekly';
   document.querySelectorAll('[data-span]').forEach((b) => {
     b.classList.toggle('on', b.dataset.span === sc.span);
     b.setAttribute('aria-pressed', String(b.dataset.span === sc.span));
     b.onclick = () => { sc.span = b.dataset.span; sc.hl = null; dash.draw('daily'); sc.save(); };
   });
+  const ttl = document.getElementById('steps-title'); if (ttl) ttl.textContent = weekly ? 'Weekly steps' : 'Daily steps';
   const lg = dash.data('log');
   if (lg.status !== 'ok') { el.textContent = lg.status === 'error' ? 'Failed to load' : '—'; return; }
   const GOAL = 5000;
@@ -776,21 +777,35 @@ dash.draw('daily', (el) => {
   const names = [...new Set(lg.data.map((r) => r.name))].sort();
   const shown = names.filter(sc.picked);
   const color = (n) => dash.colors[names.indexOf(n) % dash.colors.length];
-  const allDates = lg.data.map((r) => r.date).sort();
-  const todayIso = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date());
-  const anchor = sc.parse(sc.from || todayIso);
-  let start, end;
-  if (sc.span === 'week') { start = d3.utcMonday.floor(anchor); end = d3.utcDay.offset(start, 6); }
-  else if (sc.span === 'month') { start = d3.utcMonth.floor(anchor); end = d3.utcDay.offset(d3.utcMonth.offset(start, 1), -1); }
-  else { start = sc.parse(sc.from || allDates[0]); end = sc.parse(sc.to || allDates[allDates.length - 1]); }
-  const days = d3.utcDay.range(start, d3.utcDay.offset(end, 1));
-  const byKey = new Map(logged.map((r) => [r.name + '|' + r.date, +r.steps]));
-  const series = shown.map((n) => ({ n, pts: days.map((d) => ({ date: d, steps: byKey.has(n + '|' + iso(d)) ? byKey.get(n + '|' + iso(d)) : null })) }));
+  const latest = lg.data.map((r) => r.date).sort().pop();
+  const curWeek = sc.monday(latest);
+  const lastDay = (wk) => iso(d3.utcDay.offset(sc.parse(wk), 6));
+  let keys, series, start, end;
+  if (!weekly) {
+    // the 7 days of the selected week (or the latest week)
+    const wk = sc.cardWeek().start || curWeek;
+    start = sc.parse(wk); end = d3.utcDay.offset(start, 6);
+    keys = d3.utcDay.range(start, d3.utcDay.offset(end, 1)).map(iso);
+    const byKey = new Map(logged.map((r) => [r.name + '|' + r.date, +r.steps]));
+    series = shown.map((n) => ({ n, pts: keys.map((k) => ({ key: k, steps: byKey.has(n + '|' + k) ? byKey.get(n + '|' + k) : null })) }));
+  } else {
+    // one point per Monday-to-Sunday week: each person's total steps that week
+    const rows = logged.filter((r) => (!sc.from || r.date >= sc.from) && (!sc.to || r.date <= sc.to));
+    const wkOf = (r) => sc.monday(r.date);
+    keys = [...new Set(rows.map(wkOf))].sort();
+    if (!keys.length) { el.textContent = 'No data in this range'; return; }
+    start = sc.parse(keys[0]); end = d3.utcDay.offset(sc.parse(keys[keys.length - 1]), 6);
+    const tot = d3.rollup(rows, (v) => ({ steps: d3.sum(v, (r) => +r.steps), met: v.filter((r) => r.met === 'YES').length }), (r) => r.name, wkOf);
+    series = shown.map((n) => ({ n, pts: keys.map((k) => {
+      const t = tot.get(n) && tot.get(n).get(k);
+      return { key: k, steps: t ? t.steps : null, met: t ? t.met : 0, partial: k === curWeek && latest < lastDay(k) };
+    }) }));
+  }
 
   el.replaceChildren();
   const head = document.createElement('div'); head.className = 'sc-legend';
   const period = document.createElement('span'); period.className = 'sc-period';
-  period.textContent = sc.fmtShort(start) + ' – ' + sc.fmtShort(end);
+  period.textContent = weekly ? 'Weeks of ' + sc.fmtShort(start) + ' – ' + sc.fmtShort(sc.parse(keys[keys.length - 1])) : sc.fmtShort(start) + ' – ' + sc.fmtShort(end);
   head.append(period);
   series.forEach((s) => {
     const sp = document.createElement('span'); sp.className = 'sc-key'; sp.tabIndex = 0;
@@ -798,37 +813,52 @@ dash.draw('daily', (el) => {
     sp.onclick = () => { sc.hl = sc.hl === s.n ? null : s.n; paint(); };
     head.append(sp);
   });
-  const gl = document.createElement('span'); const gi = document.createElement('i'); gi.style.background = 'var(--cds-chart-reference)'; gl.append(gi, '5,000'); head.append(gl);
+  if (!weekly) { const gl = document.createElement('span'); const gi = document.createElement('i'); gi.style.background = 'var(--cds-chart-reference)'; gl.append(gi, '5,000'); head.append(gl); }
+  else {
+    const gl = document.createElement('span'); gl.className = 'sc-note'; gl.textContent = 'Gold ring = met the 3-day goal · hollow, dashed = this week so far'; head.append(gl);
+  }
   el.append(head);
 
-  const W = Math.max(300, el.clientWidth), H = 300, m = { t: 26, r: 40, b: 30, l: 44 };
-  const x = d3.scaleUtc().domain(days.length > 1 ? [start, end] : [d3.utcDay.offset(start, -1), d3.utcDay.offset(start, 1)]).range([m.l + 10, W - m.r - 10]);
+  const W = Math.max(300, el.clientWidth), H = 300, m = { t: 26, r: 24, b: 30, l: 44 };
+  const x = d3.scalePoint().domain(keys).range([m.l, W - m.r]).padding(0.5);
   const vals = series.flatMap((s) => s.pts.filter((p) => p.steps !== null).map((p) => p.steps));
-  const y = d3.scaleLinear().domain([0, Math.max(GOAL * 1.2, d3.max(vals) || 0)]).nice().range([H - m.b, m.t]);
-  const step = Math.max(1, Math.ceil(days.length / Math.max(2, Math.floor((W - m.l - m.r) / 58))));
-  const tf = sc.span === 'week' ? d3.utcFormat('%a %-d') : d3.utcFormat('%b %-d');
+  const y = d3.scaleLinear().domain([0, Math.max(weekly ? GOAL * 3 : GOAL * 1.2, d3.max(vals) || 0)]).nice().range([H - m.b, m.t]);
+  const step = weekly ? Math.max(1, Math.ceil(keys.length / Math.max(2, Math.floor((W - m.l - m.r) / 52)))) : 1;
+  const tf = weekly ? ((k) => sc.fmtShort(sc.parse(k))) : ((k) => d3.utcFormat(x.step() < 50 ? '%a\u00a0%-d' : '%a %-d')(sc.parse(k)));
   const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img')
-    .attr('aria-label', 'Daily steps' + (sc.people.length ? ' for ' + sc.pickLabel() : ' per person') + ' from ' + sc.fmtShort(start) + ' to ' + sc.fmtShort(end) + ', with a line at 5,000 steps');
+    .attr('aria-label', (weekly ? 'Weekly total steps' : 'Daily steps') + (sc.people.length ? ' for ' + sc.pickLabel() : ' per person') + ' from ' + sc.fmtShort(start) + ' to ' + sc.fmtShort(end) + (weekly ? '' : ', with a line at 5,000 steps'));
   svg.append('g').attr('transform', `translate(0,${H - m.b})`)
-    .call(d3.axisBottom(x).tickValues(days.filter((_, i) => i % step === 0)).tickFormat(tf).tickSizeOuter(0))
+    .call(d3.axisBottom(x).tickValues(keys.filter((_, i) => i % step === 0)).tickFormat(tf).tickSizeOuter(0))
     .call((g) => g.select('.domain').style('stroke', 'var(--cds-chart-axis)')).call((g) => g.selectAll('line').style('stroke', 'var(--cds-chart-axis)'));
   svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5).tickFormat(d3.format('~s')).tickSize(-(W - m.l - m.r)))
     .call((g) => g.select('.domain').remove()).call((g) => g.selectAll('line').style('stroke', 'var(--cds-chart-grid)'));
-  svg.append('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', y(GOAL)).attr('y2', y(GOAL))
+  if (!weekly) svg.append('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', y(GOAL)).attr('y2', y(GOAL))
     .style('stroke', 'var(--cds-chart-reference)').style('stroke-dasharray', '4 3').style('stroke-width', 1.5);
-  // today marker in week/month view
-  const today = sc.parse(todayIso);
-  if (today >= start && today <= end) svg.append('line').attr('x1', x(today)).attr('x2', x(today)).attr('y1', m.t).attr('y2', H - m.b)
+  // today (daily) or this week (weekly) marker
+  const todayIso = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date());
+  const nowKey = weekly ? sc.monday(todayIso) : todayIso;
+  if (keys.includes(nowKey)) svg.append('line').attr('x1', x(nowKey)).attr('x2', x(nowKey)).attr('y1', m.t).attr('y2', H - m.b)
     .style('stroke', 'var(--cds-chart-grid)').style('stroke-width', 6).style('opacity', 0.6);
 
   const rule = svg.append('line').attr('y1', m.t).attr('y2', H - m.b).style('stroke', 'var(--cds-chart-axis)').style('display', 'none');
   const overlay = svg.append('rect').attr('x', m.l).attr('y', m.t).attr('width', W - m.l - m.r).attr('height', H - m.t - m.b).style('fill', 'transparent');
-  const line = d3.line().defined((p) => p.steps !== null).x((p) => x(p.date)).y((p) => y(p.steps));
+  const line = d3.line().defined((p) => p.steps !== null).x((p) => x(p.key)).y((p) => y(p.steps));
+  const dayR = (p) => (p.steps >= sc.DPLAT ? 6.5 : p.steps >= sc.GOLD ? 5 : 3.5);
+  const dayFill = (p, n) => (p.steps >= sc.DPLAT ? '#ffffff' : p.steps >= sc.PLAT ? 'var(--sc-plat)' : p.steps >= sc.GOLD ? 'var(--sc-gold)' : color(n));
   const groups = series.map((s) => {
     const g = svg.append('g');
-    g.append('path').datum(s.pts).attr('d', line).style('fill', 'none').style('stroke', color(s.n)).style('stroke-width', 2.25).style('stroke-linejoin', 'round');
-    g.append('g').selectAll('circle').data(s.pts.filter((p) => p.steps !== null)).join('circle')
-      .attr('cx', (p) => x(p.date)).attr('cy', (p) => y(p.steps)).attr('class', (p) => (p.steps >= sc.DPLAT ? 'sc-dpt' : null)).attr('r', (p) => (p.steps >= sc.DPLAT ? 6.5 : p.steps >= sc.GOLD ? 5 : 3.5)).style('fill', (p) => (p.steps >= sc.DPLAT ? '#ffffff' : p.steps >= sc.PLAT ? 'var(--sc-plat)' : p.steps >= sc.GOLD ? 'var(--sc-gold)' : color(s.n))).style('stroke', (p) => (p.steps >= sc.GOLD ? color(s.n) : 'var(--color-panel)')).style('stroke-width', (p) => (p.steps >= sc.GOLD ? 2 : 1.5));
+    const solid = weekly ? s.pts.map((p) => (p.partial ? { ...p, steps: null } : p)) : s.pts;
+    g.append('path').datum(solid).attr('d', line).style('fill', 'none').style('stroke', color(s.n)).style('stroke-width', 2.25).style('stroke-linejoin', 'round');
+    if (weekly) { // dashed link into the unfinished week, so a part week doesn't look like a drop
+      const real = s.pts.filter((p) => p.steps !== null), last = real[real.length - 1];
+      if (last && last.partial && real.length > 1) g.append('path').datum(real.slice(-2)).attr('d', line).style('fill', 'none').style('stroke', color(s.n)).style('stroke-width', 1.75).style('stroke-dasharray', '3 4').style('opacity', 0.7);
+    }
+    const c = g.append('g').selectAll('circle').data(s.pts.filter((p) => p.steps !== null)).join('circle')
+      .attr('cx', (p) => x(p.key)).attr('cy', (p) => y(p.steps));
+    if (!weekly) c.attr('class', (p) => (p.steps >= sc.DPLAT ? 'sc-dpt' : null)).attr('r', dayR).style('fill', (p) => dayFill(p, s.n))
+      .style('stroke', (p) => (p.steps >= sc.GOLD ? color(s.n) : 'var(--color-panel)')).style('stroke-width', (p) => (p.steps >= sc.GOLD ? 2 : 1.5));
+    else c.attr('r', (p) => (p.met >= 3 ? 5.5 : 4)).style('fill', (p) => (p.partial ? 'var(--color-panel)' : color(s.n)))
+      .style('stroke', (p) => (p.met >= 3 ? 'var(--sc-gold)' : p.partial ? color(s.n) : 'var(--color-panel)')).style('stroke-width', (p) => (p.met >= 3 || p.partial ? 2.25 : 1.5));
     g.append('path').datum(s.pts).attr('d', line).style('fill', 'none').style('stroke', 'transparent').style('stroke-width', 16).style('cursor', 'pointer')
       .on('pointerenter', () => { sc.hover = s.n; paint(); })
       .on('pointerleave', () => { sc.hover = null; paint(); });
@@ -842,8 +872,9 @@ dash.draw('daily', (el) => {
     .attr('dominant-baseline', 'middle').text(text)
     .style('fill', fill).style('font-size', '12px').style('font-weight', 600).style('font-variant-numeric', 'tabular-nums')
     .style('paint-order', 'stroke').style('stroke', 'var(--color-panel)').style('stroke-width', 4).style('stroke-linejoin', 'round');
+  const short = (v) => (weekly && v >= 10000 ? d3.format('.1f')(v / 1000) + 'k' : sc.num(v));
 
-  function paint(day) {
+  function paint(key) {
     labels.selectAll('*').remove();
     const focus = sc.hover || sc.hl;
     groups.forEach(({ s, g }) => g.style('opacity', focus && focus !== s.n ? 0.15 : 1));
@@ -852,15 +883,16 @@ dash.draw('daily', (el) => {
       rule.style('display', 'none');
       const s = series.find((q) => q.n === focus);
       const pts = s ? s.pts.filter((p) => p.steps !== null) : [];
-      const tight = pts.length > 1 && (x(pts[1].date) - x(pts[0].date)) < 44;
-      pts.forEach((p, i) => label(x(p.date), y(p.steps) + (tight && i % 2 ? 16 : -12), sc.num(p.steps), color(focus)));
+      const tight = x.step() < 44;
+      pts.forEach((p, i) => label(x(p.key), y(p.steps) + (tight && i % 2 ? 16 : -12), short(p.steps), color(focus)));
       return;
     }
-    if (!day) { rule.style('display', 'none'); return; }
-    const sx = x(day);
+    if (!key) { rule.style('display', 'none'); return; }
+    const sx = x(key);
     rule.attr('x1', sx).attr('x2', sx).style('display', null);
-    label(Math.min(Math.max(sx, m.l + 30), W - m.r - 30), 12, sc.fmtDay(day), 'var(--color-fg)');
-    const pts = series.map((s) => ({ s, v: s.pts.find((p) => +p.date === +day).steps })).filter((q) => q.v !== null)
+    const pend = series.some((s) => { const p = s.pts.find((q) => q.key === key); return p && p.partial; });
+    label(Math.min(Math.max(sx, m.l + 50), W - m.r - 50), 12, weekly ? 'Week of ' + sc.fmtShort(sc.parse(key)) + (pend ? ' (so far)' : '') : sc.fmtDay(sc.parse(key)), 'var(--color-fg)');
+    const pts = series.map((s) => ({ s, v: s.pts.find((p) => p.key === key).steps })).filter((q) => q.v !== null)
       .map((q) => ({ ...q, ty: y(q.v) })).sort((a, b) => a.ty - b.ty);
     for (let i = 1; i < pts.length; i++) pts[i].ty = Math.max(pts[i].ty, pts[i - 1].ty + 14);
     const over = pts.length ? pts[pts.length - 1].ty - (H - m.b - 4) : 0;
@@ -869,9 +901,9 @@ dash.draw('daily', (el) => {
     pts.forEach((q) => label(sx + (right ? 9 : -9), q.ty, (shown.length > 1 ? q.s.n + ' ' : '') + sc.num(q.v), color(q.s.n), right ? 'start' : 'end'));
   }
   overlay.on('pointermove', (ev) => {
-    const t = +x.invert(d3.pointer(ev)[0]);
-    const day = days.reduce((a, b) => (Math.abs(b - t) < Math.abs(a - t) ? b : a), days[0]);
-    paint(day);
+    const px = d3.pointer(ev)[0];
+    const key = keys.reduce((a, b) => (Math.abs(x(b) - px) < Math.abs(x(a) - px) ? b : a), keys[0]);
+    paint(key);
   }).on('pointerleave', () => paint());
   paint();
 });
